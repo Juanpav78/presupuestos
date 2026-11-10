@@ -15,7 +15,7 @@ Los datos de la versión anterior (gastos y presupuesto) se migran automáticame
 
 ## Usarla en el celular
 
-Al hacer push a `main` se publica sola en GitHub Pages (ver `.github/workflows/deploy.yml`). Activa una vez: **Settings → Pages → Source: GitHub Actions**. Luego abre `https://juanpav78.github.io/presupuestos/` y usa "Agregar a pantalla de inicio".
+Se publica en **Netlify** con cada push a `main`. Toda la configuración está en `netlify.toml` (Node 20, `npm run build`, carpeta `dist`), así que no hace falta tocar nada en el panel de Netlify. Abre la URL de Netlify en el celular y usa "Agregar a pantalla de inicio".
 
 ## Desarrollo
 

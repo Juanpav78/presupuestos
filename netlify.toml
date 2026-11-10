@@ -1,0 +1,13 @@
+[build]
+  command = "npm install && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--no-audit --no-fund"
+
+# Si en el futuro se agregan rutas, todas cargan la app
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
