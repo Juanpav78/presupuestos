@@ -34,7 +34,7 @@ export function FormGasto({ datos, mes, inicial, onGuardar, onEliminar }) {
   const tarjetas = datos.deudas.filter((d) => d.tipo === 'tarjeta')
   const [v, setV] = useState(
     inicial
-      ? { ...inicial, deudaId: inicial.deudaId ?? '', cuotas: datos.deudas.find((d) => d.id === inicial.deudaId)?.compras.find((c) => c.id === inicial.compraId)?.cuotas ?? 1 }
+      ? { ...inicial, deudaId: inicial.deudaId ?? '', cuotas: inicial.cuotas ?? datos.deudas.find((d) => d.id === inicial.deudaId)?.compras.find((c) => c.id === inicial.compraId)?.cuotas ?? 1 }
       : { nombre: '', monto: '', categoria: 'Comida', fecha: fechaPorDefecto(mes), deudaId: '', cuotas: 1 }
   )
   const [error, setError] = useState('')
@@ -87,7 +87,7 @@ export function FormGasto({ datos, mes, inicial, onGuardar, onEliminar }) {
         {onEliminar && (
           <button type="button" className="btn btn-peligro" onClick={() => confirm('¿Eliminar este gasto?') && onEliminar()}>Eliminar</button>
         )}
-        <button type="submit" className="btn btn-primario">{inicial ? 'Guardar cambios' : 'Añadir gasto'}</button>
+        <button type="submit" className="btn btn-primario">{inicial?.id ? 'Guardar cambios' : 'Añadir gasto'}</button>
       </div>
     </form>
   )

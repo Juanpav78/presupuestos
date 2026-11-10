@@ -135,7 +135,8 @@ export const ordenarPorEstrategia = (deudas, estrategia) => {
  * Simula mes a mes el pago de todas las deudas.
  * estrategia: 'avalancha' | 'bola' | 'minimos'
  */
-export const simularPlan = (deudas, presupuestoMensual, estrategia = 'avalancha', maxMeses = 360) => {
+/** extras: función opcional (númeroDeMes) => abono extra ese mes (1 = mes actual). */
+export const simularPlan = (deudas, presupuestoMensual, estrategia = 'avalancha', maxMeses = 360, extras = null) => {
   let lista = deudas
     .filter((d) => saldoDeuda(d) > 0.5)
     .map((d) => ({
@@ -158,7 +159,7 @@ export const simularPlan = (deudas, presupuestoMensual, estrategia = 'avalancha'
   while (total() > 0.5 && mes < maxMeses) {
     mes++
     const pagos = {}
-    let disponible = estrategia === 'minimos' ? Infinity : presupuestoMensual
+    let disponible = estrategia === 'minimos' ? Infinity : presupuestoMensual + (Number(extras?.(mes)) || 0)
 
     // Cargos del mes
     for (const d of lista) {

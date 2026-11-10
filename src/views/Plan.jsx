@@ -1,10 +1,11 @@
 import { useMemo } from 'react'
-import { LuMountain, LuSnowflake, LuTarget, LuCalendarCheck, LuLightbulb, LuTrophy, LuCreditCard } from 'react-icons/lu'
+import { LuMountain, LuSnowflake, LuTarget, LuCalendarCheck, LuLightbulb, LuTrophy, LuCreditCard, LuCalculator, LuBellRing, LuGift } from 'react-icons/lu'
 import { mesActual, nombreMes, sumarMeses, color } from '../lib/format'
 import { cobroDelMes, ordenarPorEstrategia, saldoDeuda, simularPlan, tasaEA } from '../lib/deudas'
 import { resumenMes } from '../lib/resumen'
 import { Tarjeta, Vacio, Dato, Segmentado, NumeroAnimado } from '../components/UI'
 import { Lineas, Leyenda } from '../components/Graficas'
+import { SimuladorAbonos, extrasDesde } from '../components/Herramientas'
 
 const textoMeses = (m) => {
   if (m < 12) return `${m} ${m === 1 ? 'mes' : 'meses'}`
@@ -22,9 +23,11 @@ export default function Plan({ datos, acciones, fmt, abrir }) {
   const pago = Math.max(Number(datos.config.pagoDeudasMensual) || 0, minimos)
   const extra = pago - minimos
 
-  const plan = useMemo(() => simularPlan(activas, pago, estrategia), [datos.deudas, pago, estrategia])
+  const abonos = datos.config.abonosPlaneados ?? []
+  const extras = extrasDesde(abonos, hoy)
+  const plan = useMemo(() => simularPlan(activas, pago, estrategia, 360, extras), [datos.deudas, pago, estrategia, abonos])
   const soloMinimos = useMemo(() => simularPlan(activas, minimos, 'minimos'), [datos.deudas, minimos])
-  const alterna = useMemo(() => simularPlan(activas, pago, estrategia === 'avalancha' ? 'bola' : 'avalancha'), [datos.deudas, pago, estrategia])
+  const alterna = useMemo(() => simularPlan(activas, pago, estrategia === 'avalancha' ? 'bola' : 'avalancha', 360, extras), [datos.deudas, pago, estrategia, abonos])
 
   if (!activas.length) {
     return (
@@ -86,6 +89,11 @@ export default function Plan({ datos, acciones, fmt, abrir }) {
         </p>
       </Tarjeta>
 
+      <div className="herramientas-fila">
+        <button className="herramienta-btn" onClick={() => abrir('alcanza')}><LuCalculator aria-hidden="true" /><span><b>¿Me alcanza?</b><small>Antes de comprar</small></span></button>
+        <button className="herramienta-btn" onClick={() => abrir('recordatorios')}><LuBellRing aria-hidden="true" /><span><b>Recordatorios</b><small>En tu calendario</small></span></button>
+      </div>
+
       <section className="hero plan-hero">
         <span className="hero-glow" aria-hidden="true" />
         {plan.atascada ? (
@@ -94,7 +102,7 @@ export default function Plan({ datos, acciones, fmt, abrir }) {
           <>
             <span className="hero-etiqueta"><LuTrophy aria-hidden="true" /> Libre de deudas en</span>
             <div className="hero-monto">{textoMeses(plan.meses)}</div>
-            <span className="hero-sub">{nombreMes(sumarMeses(hoy, plan.meses))}</span>
+            <span className="hero-sub">{nombreMes(sumarMeses(hoy, plan.meses))}{abonos.length > 0 && <> · <LuGift aria-hidden="true" /> con {abonos.length} abono{abonos.length > 1 ? 's' : ''} extra</>}</span>
             <div className="hero-datos">
               <Dato etiqueta="Intereses totales" valor={fmt.corto(plan.totalIntereses)} />
               <Dato etiqueta="Total a pagar" valor={fmt.corto(plan.totalPagado)} />
@@ -117,6 +125,8 @@ export default function Plan({ datos, acciones, fmt, abrir }) {
         />
         <Leyenda items={[{ nombre: 'Tu plan', color: 'var(--acento)' }, { nombre: 'Pagando solo lo del mes', color: 'var(--rojo)' }]} />
       </Tarjeta>
+
+      <SimuladorAbonos datos={datos} acciones={acciones} fmt={fmt} />
 
       <Tarjeta titulo={`Este mes paga así`} Icono={LuCreditCard}>
         <ul className="lista">

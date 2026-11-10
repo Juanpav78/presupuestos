@@ -1,6 +1,6 @@
 import {
   LuTriangleAlert, LuCalendarDays, LuChartPie, LuChartColumn, LuScale, LuCreditCard, LuRepeat, LuCheck,
-  LuSparkles, LuArrowRight, LuWallet,
+  LuSparkles, LuArrowRight, LuWallet, LuBellRing,
 } from 'react-icons/lu'
 import { mesActual, soloMes, nombreMes, pct, formatFecha, hoyISO, color } from '../lib/format'
 import { historico, resumenMes, vencimientos } from '../lib/resumen'
@@ -94,7 +94,8 @@ export default function Inicio({ datos, acciones, mes, fmt, ir, abrir }) {
         </div>
       )}
 
-      <Tarjeta titulo={r.futuro ? `Por pagar en ${soloMes(mes).toLowerCase()}` : 'Por pagar este mes'} Icono={LuWallet}>
+      <Tarjeta titulo={r.futuro ? `Por pagar en ${soloMes(mes).toLowerCase()}` : 'Por pagar este mes'} Icono={LuWallet}
+        accion={venc.length > 0 && <button className="btn-icono" aria-label="Recordatorios en el calendario" onClick={() => abrir('recordatorios')}><LuBellRing /></button>}>
         {r.futuro && <p className="nota"><LuSparkles aria-hidden="true" /> Proyección suponiendo que pagas al día las cuotas de los meses anteriores.</p>}
         <div className="pagar-mes">
           <div><span>Total</span><strong>{fmt.dinero(r.compromisos)}</strong></div>

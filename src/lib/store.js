@@ -13,6 +13,7 @@ export const estadoInicial = {
     presupuestoVariable: 0,
     pagoDeudasMensual: 0,
     estrategia: 'avalancha',
+    abonosPlaneados: [], // {id, mes, monto, anual}
   },
   ingresosExtra: [], // {id, nombre, monto, fecha}
   gastos: [], // {id, nombre, monto, categoria, fecha, deudaId?, compraId?}

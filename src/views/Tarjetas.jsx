@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   LuPlus, LuFileSpreadsheet, LuArrowLeft, LuWallet, LuShoppingBag, LuPencil, LuUndo2, LuCreditCard,
-  LuTriangleAlert, LuHistory, LuTarget, LuChevronDown, LuCalendarRange, LuCircleCheck,
+  LuTriangleAlert, LuHistory, LuTarget, LuChevronDown, LuCalendarRange, LuCircleCheck, LuCalculator,
 } from 'react-icons/lu'
 import { formatFecha, mesActual, mesDe, nombreMes, soloMes, pct } from '../lib/format'
 import { cobroDelMes, cobroCompra, finCompras, interesesDeuda, ordenarCompras, proyectar, saldoDeuda, simularPlan, tasaEA, tasaMensual } from '../lib/deudas'
@@ -53,7 +53,8 @@ function Lista({ datos, fmt, abrir, ir, abrirDeuda }) {
 
       <div className="botones">
         <button className="btn btn-secundario" onClick={() => abrir('deuda-nueva')}><LuPlus aria-hidden="true" /> Nueva</button>
-        <button className="btn btn-secundario" onClick={() => abrir('importar')}><LuFileSpreadsheet aria-hidden="true" /> Subir Excel</button>
+        <button className="btn btn-secundario" onClick={() => abrir('importar')}><LuFileSpreadsheet aria-hidden="true" /> Excel</button>
+        <button className="btn btn-secundario" onClick={() => abrir('alcanza')}><LuCalculator aria-hidden="true" /> ¿Me alcanza?</button>
       </div>
 
       <div className="pila-tarjetas">
