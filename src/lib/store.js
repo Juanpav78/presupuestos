@@ -14,6 +14,7 @@ export const estadoInicial = {
     pagoDeudasMensual: 0,
     estrategia: 'avalancha',
     abonosPlaneados: [], // {id, mes, monto, anual}
+    jardin: false, // minijuego opcional
   },
   fuentes: [], // ingresos fijos: {id, nombre, monto, frecuencia:'mensual'|'quincenal', dia, dia2, desde}
   recibos: {}, // estado de ingresos fijos por fecha: { 'f:fuenteId:YYYY-MM:n': {estado, fecha, monto} }
@@ -157,7 +158,7 @@ export function useFinanzas() {
             deudas = editarDeuda(deudas, g.deudaId, (d) => ({ ...d, compras: [...d.compras, compra] }))
           }
         }
-        const gasto = { ...g, compraId: g.deudaId ? compraId : undefined, deudaId: g.deudaId || undefined }
+        const gasto = { creado: Date.now(), ...g, compraId: g.deudaId ? compraId : undefined, deudaId: g.deudaId || undefined }
         return { ...s, deudas, gastos: upsert(s.gastos, gasto) }
       }),
     eliminarGasto: (id) =>
@@ -261,7 +262,7 @@ export function useFinanzas() {
         if (!d) return s
         const mes = mesDe(fecha)
         const res = aplicarPago(d, monto, mes)
-        const pago = { id, deudaId, monto: Number(monto), fecha, mes, reparto: res.reparto, abonos: res.abonos, antes: d.compras }
+        const pago = { id, deudaId, monto: Number(monto), fecha, mes, creado: Date.now(), reparto: res.reparto, abonos: res.abonos, antes: d.compras }
         return { ...s, pagos: [...s.pagos, pago], deudas: editarDeuda(s.deudas, deudaId, (x) => ({ ...x, compras: res.compras })) }
       })
       return id

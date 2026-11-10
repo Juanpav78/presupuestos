@@ -1,5 +1,6 @@
 import { useRef } from 'react'
-import { LuWallet, LuFileSpreadsheet, LuDownload, LuUpload, LuDatabase, LuTrash2, LuShieldCheck } from 'react-icons/lu'
+import { LuWallet, LuFileSpreadsheet, LuDownload, LuUpload, LuDatabase, LuTrash2, LuShieldCheck, LuSprout } from 'react-icons/lu'
+import Mascota from '../components/Mascota'
 import { MONEDAS, hoyISO } from '../lib/format'
 import { crearExcel, descargar } from '../lib/excel'
 import { exportar } from '../lib/importar'
@@ -50,6 +51,26 @@ export default function Ajustes({ datos, acciones, ir, abrir }) {
             ir('inicio')
           }}
         />
+      </Tarjeta>
+
+      <Tarjeta titulo="Jardín (minijuego)" Icono={LuSprout}>
+        <div className="jardin-ajuste">
+          <Mascota estado={datos.config.jardin ? 'feliz' : 'tranquilo'} colorKey="oro" tamano={64} />
+          <p className="nota">Cada tarjeta se vuelve una mascota que se enferma o se alegra según cómo la cuides, y un árbol crece con tu salud financiera.</p>
+        </div>
+        <button
+          className={`interruptor ${datos.config.jardin ? 'activo' : ''}`}
+          role="switch"
+          aria-checked={!!datos.config.jardin}
+          onClick={() => {
+            const nuevo = !datos.config.jardin
+            acciones.setConfig({ jardin: nuevo })
+            if (nuevo) { avisar('¡Jardín activado! Búscalo en el botón 🌱 de arriba'); ir('jardin') }
+          }}
+        >
+          <span className="interruptor-bola" aria-hidden="true" />
+          {datos.config.jardin ? 'Activado' : 'Activar jardín'}
+        </button>
       </Tarjeta>
 
       <Tarjeta titulo="Excel" Icono={LuFileSpreadsheet}>

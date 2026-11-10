@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   LuLayoutDashboard, LuReceipt, LuCreditCard, LuTarget, LuSettings, LuPlus, LuChevronLeft, LuChevronRight,
-  LuRepeat, LuWallet, LuShoppingBag, LuFileSpreadsheet, LuBanknote, LuLandmark, LuCalculator, LuBellRing, LuHandCoins, LuBriefcase,
+  LuRepeat, LuWallet, LuShoppingBag, LuFileSpreadsheet, LuBanknote, LuLandmark, LuCalculator, LuBellRing, LuHandCoins, LuBriefcase, LuSprout,
 } from 'react-icons/lu'
 import { useFinanzas } from './lib/store'
 import { crearFormato, mesActual, nombreMes, sumarMeses } from './lib/format'
@@ -12,6 +12,7 @@ import Ingresos from './views/Ingresos'
 import Tarjetas from './views/Tarjetas'
 import Plan from './views/Plan'
 import Ajustes from './views/Ajustes'
+import Jardin from './views/Jardin'
 import { Hoja, Avisos, avisar } from './components/UI'
 import TarjetaVisual from './components/TarjetaVisual'
 import {
@@ -43,7 +44,7 @@ export default function App() {
   }
 
   const props = { datos, acciones, mes, fmt, ir, abrir }
-  const Vista = { inicio: Inicio, gastos: Gastos, ingresos: Ingresos, tarjetas: Tarjetas, plan: Plan, ajustes: Ajustes }[vista]
+  const Vista = { inicio: Inicio, gastos: Gastos, ingresos: Ingresos, tarjetas: Tarjetas, plan: Plan, ajustes: Ajustes, jardin: Jardin }[vista]
   const conMes = ['inicio', 'gastos', 'ingresos'].includes(vista)
   const tarjetas = datos.deudas.filter((d) => d.tipo === 'tarjeta')
   const conSaldo = datos.deudas.filter((d) => saldoDeuda(d) > 0)
@@ -54,8 +55,13 @@ export default function App() {
         <div className="cabecera-fila">
           <div className="marca">
             <span className="marca-logo" aria-hidden="true"><LuBanknote /></span>
-            <h1>{vista === 'ajustes' ? 'Ajustes' : PESTANAS.find((p) => p.id === vista)?.texto}</h1>
+            <h1>{vista === 'ajustes' ? 'Ajustes' : vista === 'jardin' ? 'Jardín' : PESTANAS.find((p) => p.id === vista)?.texto}</h1>
           </div>
+          {datos.config.jardin && (
+            <button className="btn-icono btn-jardin" aria-label="Jardín" aria-pressed={vista === 'jardin'} onClick={() => ir(vista === 'jardin' ? 'inicio' : 'jardin')}>
+              <LuSprout />
+            </button>
+          )}
           <button className="btn-icono" aria-label="Ajustes" aria-pressed={vista === 'ajustes'} onClick={() => ir(vista === 'ajustes' ? 'inicio' : 'ajustes')}>
             <LuSettings />
           </button>
@@ -81,7 +87,7 @@ export default function App() {
       )}
 
       <nav className="navegacion" aria-label="Secciones">
-        <div className="nav-interior" style={{ '--i': Math.max(PESTANAS.findIndex((p) => p.id === vista), 0), '--visible': vista === 'ajustes' ? 0 : 1 }}>
+        <div className="nav-interior" style={{ '--i': Math.max(PESTANAS.findIndex((p) => p.id === vista), 0), '--visible': PESTANAS.some((p) => p.id === vista) ? 1 : 0 }}>
           <span className="nav-indicador" aria-hidden="true" />
           {PESTANAS.map((p) => (
             <button key={p.id} className={vista === p.id ? 'activa' : ''} aria-current={vista === p.id ? 'page' : undefined} onClick={() => ir(p.id)}>
@@ -247,7 +253,7 @@ export default function App() {
             <FormPago deuda={d} fmt={fmt} onPagar={(m, f) => {
               const id = acciones.pagarDeuda(d.id, m, f)
               cerrar()
-              avisar(`Pago de ${fmt.dinero(m)} aplicado`, { texto: 'Deshacer', onClick: () => { acciones.deshacerPago(id); avisar('Pago revertido') } })
+              avisar(datos.config.jardin ? `¡${d.nombre} está feliz! Pago de ${fmt.dinero(m)} aplicado 💛` : `Pago de ${fmt.dinero(m)} aplicado`, { texto: 'Deshacer', onClick: () => { acciones.deshacerPago(id); avisar('Pago revertido') } })
             }} />
           </Hoja>
         )
