@@ -5,6 +5,7 @@ App web pensada para el celular para controlar tus gastos y tus tarjetas de cré
 ## Secciones
 
 - **Inicio**: cuánto te queda libre en el mes, lo que debes pagar (pagado / falta) con fechas, alertas y un **calendario** de pagos y gastos. Incluye gráficas de a dónde va tu ingreso, gastos por categoría, regla 50/30/20 y los últimos 6 meses.
+- **Ingresos**: salario e ingresos fijos (mensuales o quincenales) e ingresos únicos. Los que esperas recibir no cuentan como disponibles hasta que los confirmas: el día que llegan aparece "Dinero por reclamar" con "Lo recibí" o "Posponer".
 - **Gastos**: tiene dos pestañas.
   - *Del día a día*: gastos con categoría y medio de pago. Si pagas con tarjeta eliges las cuotas y se crea la compra en esa tarjeta.
   - *Fijos mensuales*: arriendo, servicios, suscripciones, con día de pago y check de pagado.

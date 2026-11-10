@@ -35,11 +35,11 @@ export default function Ajustes({ datos, acciones, ir, abrir }) {
   return (
     <>
       <Tarjeta titulo="Tu dinero" Icono={LuWallet}>
+        <p className="nota">Tu salario y otros ingresos ahora se configuran en la pestaña <button className="btn-texto" onClick={() => ir('ingresos')}>Ingresos</button>.</p>
         <Formulario
-          key={`${datos.config.ingresoMensual}-${datos.config.presupuestoVariable}-${datos.config.moneda}`}
+          key={`${datos.config.presupuestoVariable}-${datos.config.moneda}`}
           inicial={datos.config}
           campos={[
-            { nombre: 'ingresoMensual', etiqueta: 'Ingreso mensual (lo que te llega)', tipo: 'monto', grande: true },
             { nombre: 'presupuestoVariable', etiqueta: 'Presupuesto para gastos del día a día', tipo: 'monto', ayuda: 'Comida, transporte, salidas… sin contar fijos ni tarjetas.' },
             { nombre: 'moneda', etiqueta: 'Moneda', tipo: 'segmento', opciones: Object.keys(MONEDAS).map((m) => ({ valor: m, texto: m })) },
           ]}

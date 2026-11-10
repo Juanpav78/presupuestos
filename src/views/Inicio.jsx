@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import {
   LuTriangleAlert, LuCalendarDays, LuChartPie, LuChartColumn, LuScale, LuCreditCard, LuRepeat, LuCheck,
-  LuSparkles, LuArrowRight, LuWallet, LuBellRing,
+  LuSparkles, LuArrowRight, LuWallet, LuBellRing, LuMoon, LuX,
 } from 'react-icons/lu'
 import { mesActual, soloMes, nombreMes, pct, formatFecha, hoyISO, color, fechaEnMes } from '../lib/format'
 import { historico, resumenMes, vencimientos } from '../lib/resumen'
@@ -9,6 +10,8 @@ import { infoCategoria, IconoCategoria } from '../lib/categorias'
 import { Tarjeta, Dato, NumeroAnimado } from '../components/UI'
 import { Barras, Dona, Leyenda, Progreso } from '../components/Graficas'
 import Calendario from '../components/Calendario'
+import { PorReclamar } from '../components/IngresosUI'
+import { porReclamar, ingresosDelMes } from '../lib/ingresos'
 
 export default function Inicio({ datos, acciones, mes, fmt, ir, abrir }) {
   const r = resumenMes(datos, mes)
@@ -16,7 +19,13 @@ export default function Inicio({ datos, acciones, mes, fmt, ir, abrir }) {
   const hoy = hoyISO()
   const venc = vencimientos(datos, mes)
   const pendientes = venc.filter((v) => !v.pagado)
-  const sinConfigurar = !datos.config.ingresoMensual && !datos.gastos.length && !datos.deudas.length && !datos.fijos.length
+  const sinConfigurar = !(datos.fuentes ?? []).length && !datos.gastos.length && !datos.deudas.length && !datos.fijos.length
+  const reclamar = esMesActual ? porReclamar(datos) : []
+  // Recordatorio nocturno dentro de la app: después de las 8 p. m. si no registraste nada hoy
+  const horaNoche = Number((datos.config.horaRecordatorio || '20:00').split(':')[0])
+  const [ocultarNoche, setOcultarNoche] = useState(() => { try { return localStorage.getItem('noche') === hoy } catch { return false } })
+  const registroHoy = datos.gastos.some((g) => g.fecha === hoy || (g.creado && new Date(g.creado).toISOString().slice(0, 10) === hoy))
+  const mostrarNoche = esMesActual && !sinConfigurar && !ocultarNoche && new Date().getHours() >= horaNoche && !registroHoy
 
   const destino = [
     { nombre: 'Gastos fijos', valor: r.fijosTotal, color: '#8B5CF6' },
@@ -46,6 +55,7 @@ export default function Inicio({ datos, acciones, mes, fmt, ir, abrir }) {
   const eventos = [
     ...venc.map((v) => ({ ...v, tipo: v.tipo })),
     ...r.gastosMes.map((g) => ({ tipo: 'gasto', fecha: g.fecha, nombre: g.nombre, monto: g.monto, id: g.id })),
+    ...ingresosDelMes(datos, mes).map((i) => ({ ...i, tipo: 'ingreso', pagado: i.recibido, ingreso: i })),
     ...datos.deudas.filter((d) => d.diaCorte && d.tipo !== 'credito').map((d) => ({ tipo: 'corte', id: d.id, fecha: fechaEnMes(mes, d.diaCorte), nombre: `Corte ${d.nombre}`, monto: 0 })),
   ]
 
@@ -53,6 +63,7 @@ export default function Inicio({ datos, acciones, mes, fmt, ir, abrir }) {
     if (v.tipo === 'deuda') abrir('pago', { deudaId: v.id })
     else if (v.tipo === 'fijo') acciones.togglePagoFijo(mes, v.id)
     else if (v.tipo === 'corte') ir('tarjetas')
+    else if (v.tipo === 'ingreso') abrir(v.ingreso.recibido ? 'recibido' : v.ingreso.fecha <= hoy ? 'reclamar' : 'posponer', { item: v.ingreso })
     else abrir('gasto', { gasto: datos.gastos.find((g) => g.id === v.id) })
   }
 
@@ -64,13 +75,27 @@ export default function Inicio({ datos, acciones, mes, fmt, ir, abrir }) {
           <h2>Bienvenido a tus finanzas</h2>
           <p>Configúralo en 2 minutos:</p>
           <div className="pasos-inicio">
-            <button onClick={() => ir('ajustes')}><span>1</span>Tu ingreso mensual<LuArrowRight /></button>
+            <button onClick={() => abrir('fuente')}><span>1</span>Tu salario o ingreso fijo<LuArrowRight /></button>
             <button onClick={() => abrir('deuda-nueva')}><span>2</span>Tarjetas y créditos<LuArrowRight /></button>
             <button onClick={() => abrir('fijo')}><span>3</span>Gastos fijos<LuArrowRight /></button>
             <button onClick={() => abrir('importar')}><span>⚡</span>O súbelo todo desde Excel<LuArrowRight /></button>
           </div>
         </section>
       )}
+
+      {mostrarNoche && (
+        <section className="tarjeta recordatorio-noche aparecer">
+          <LuMoon aria-hidden="true" />
+          <div>
+            <strong>¿Ya registraste tus gastos de hoy?</strong>
+            <small>Toma 1 minuto y mantiene tus cuentas al día.</small>
+          </div>
+          <button className="btn btn-mini btn-primario" onClick={() => abrir('gasto')}>Registrar</button>
+          <button className="btn-icono" aria-label="Hoy no gasté" onClick={() => { try { localStorage.setItem('noche', hoy) } catch {} setOcultarNoche(true) }}><LuX /></button>
+        </section>
+      )}
+
+      <PorReclamar items={reclamar} fmt={fmt} abrir={abrir} compacta />
 
       <section className="hero">
         <span className="hero-glow" aria-hidden="true" />
@@ -86,6 +111,7 @@ export default function Inicio({ datos, acciones, mes, fmt, ir, abrir }) {
           <Dato etiqueta="Gastado" valor={fmt.corto(r.gastado)} />
           <Dato etiqueta="Deuda total" valor={fmt.corto(r.deudaTotal)} />
         </div>
+        {r.porRecibir > 0 && <span className="hero-sub">+ {fmt.dinero(r.porRecibir)} por recibir que aún no contamos.</span>}
       </section>
 
       {alertas.length > 0 && (

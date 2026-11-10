@@ -1,18 +1,20 @@
 import { cobroProyectado, interesesDeuda, proyectar, saldoDeuda } from './deudas'
 import { fechaEnMes, sumarMeses, mesActual } from './format'
 import { infoCategoria } from './categorias'
+import { resumenIngresos } from './ingresos'
 
 const suma = (l, f = (x) => x.monto) => l.reduce((t, x) => t + (Number(f(x)) || 0), 0)
 
 export function resumenMes(datos, mes) {
-  const { config, gastos, fijos, deudas, pagos, ingresosExtra, pagosFijos } = datos
+  const { config, gastos, fijos, deudas, pagos, pagosFijos } = datos
 
   const gastosMes = gastos.filter((g) => g.fecha?.startsWith(mes))
-  const extrasMes = ingresosExtra.filter((i) => i.fecha?.startsWith(mes))
   const pagosMes = pagos.filter((p) => p.mes === mes || p.fecha?.startsWith(mes))
   const pagados = pagosFijos[mes] ?? []
 
-  const ingreso = (Number(config.ingresoMensual) || 0) + suma(extrasMes)
+  // Solo cuenta lo recibido + ingresos fijos del mes; lo esperado sin confirmar va aparte
+  const ing = resumenIngresos(datos, mes)
+  const ingreso = ing.contable
   const gastado = suma(gastosMes)
   const gastadoTarjeta = suma(gastosMes.filter((g) => g.deudaId))
   const gastadoEfectivo = gastado - gastadoTarjeta
@@ -54,7 +56,7 @@ export function resumenMes(datos, mes) {
   Object.entries(porCategoria).forEach(([c, v]) => (tipoGasto[infoCategoria(c).tipo] += v))
 
   return {
-    futuro, ingreso, gastado, gastadoTarjeta, gastadoEfectivo, gastosMes,
+    futuro, ingreso, ingresoRecibido: ing.recibido, porRecibir: ing.porRecibir, gastado, gastadoTarjeta, gastadoEfectivo, gastosMes,
     fijosTotal, fijosPagados, pagados,
     minimos, pendienteDeudas, pagoDeudas, abonado, interesesMes, deudaTotal, utilizacion,
     compromisos, libre, pagadoMes, porCategoria, tipoGasto,

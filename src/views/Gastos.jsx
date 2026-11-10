@@ -32,7 +32,6 @@ function Normales({ datos, mes, fmt, abrir }) {
   const lista = r.gastosMes.filter((g) => !filtro || g.categoria === filtro).sort((a, b) => b.fecha.localeCompare(a.fecha))
   const porDia = lista.reduce((acc, g) => ((acc[g.fecha] = acc[g.fecha] || []).push(g), acc), {})
   const categorias = [...new Set(r.gastosMes.map((g) => g.categoria))]
-  const extras = datos.ingresosExtra.filter((i) => i.fecha?.startsWith(mes))
   const tarjeta = (id) => datos.deudas.find((d) => d.id === id)
 
   return (
@@ -89,20 +88,6 @@ function Normales({ datos, mes, fmt, abrir }) {
         ))
       )}
 
-      <Tarjeta titulo="Ingresos extra" Icono={LuBanknote} accion={<button className="btn-texto" onClick={() => abrir('ingreso')}><LuPlus aria-hidden="true" /> Agregar</button>}>
-        <p className="nota">Salario: {fmt.dinero(datos.config.ingresoMensual)}. Suma aquí primas, bonos o trabajos extra del mes.</p>
-        {extras.length > 0 && (
-          <ul className="lista compacta">
-            {extras.map((i) => (
-              <li key={i.id} onClick={() => abrir('ingreso', { ingreso: i })}>
-                <span className="icono-cat" style={{ '--c': '#22C55E' }}><LuBanknote /></span>
-                <div className="lista-texto"><strong>{i.nombre}</strong><small>{formatFecha(i.fecha)}</small></div>
-                <span className="monto texto-verde">+{fmt.dinero(i.monto)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Tarjeta>
     </>
   )
 }

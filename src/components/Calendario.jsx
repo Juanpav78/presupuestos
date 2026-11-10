@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { LuCheck, LuCreditCard, LuRepeat, LuReceipt, LuScissors } from 'react-icons/lu'
+import { LuCheck, LuCreditCard, LuRepeat, LuReceipt, LuScissors, LuHandCoins } from 'react-icons/lu'
 import { diasDelMes, formatFecha, hoyISO } from '../lib/format'
 
 const DIAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
-const ICONOS = { deuda: LuCreditCard, fijo: LuRepeat, gasto: LuReceipt, corte: LuScissors }
-const TEXTO = { deuda: 'Pago de tarjeta/crédito', fijo: 'Gasto fijo', gasto: 'Gasto', corte: 'Fecha de corte: lo que compres después va al siguiente extracto' }
+const ICONOS = { deuda: LuCreditCard, fijo: LuRepeat, gasto: LuReceipt, corte: LuScissors, ingreso: LuHandCoins }
+const TEXTO = { deuda: 'Pago de tarjeta/crédito', fijo: 'Gasto fijo', gasto: 'Gasto', corte: 'Fecha de corte: lo que compres después va al siguiente extracto', ingreso: 'Ingreso' }
 
 /** eventos: [{ fecha, tipo: 'deuda'|'fijo'|'gasto', nombre, monto, pagado }] */
 export default function Calendario({ mes, eventos, fmt, onElegir }) {
@@ -41,7 +41,7 @@ export default function Calendario({ mes, eventos, fmt, onElegir }) {
               {i + 1}
               {ev.length > 0 && (
                 <span className="cal-puntos" aria-hidden="true">
-                  {['deuda', 'corte', 'fijo', 'gasto'].filter((t) => ev.some((e) => e.tipo === t)).map((t) => <i key={t} className={`p-${t}`} />)}
+                  {['ingreso', 'deuda', 'corte', 'fijo', 'gasto'].filter((t) => ev.some((e) => e.tipo === t)).map((t) => <i key={t} className={`p-${t}`} />)}
                 </span>
               )}
             </button>
@@ -49,6 +49,7 @@ export default function Calendario({ mes, eventos, fmt, onElegir }) {
         })}
       </div>
       <div className="cal-leyenda" aria-hidden="true">
+        <span><i className="p-ingreso" /> Ingresos</span>
         <span><i className="p-deuda" /> Tarjetas</span>
         <span><i className="p-corte" /> Corte</span>
         <span><i className="p-fijo" /> Fijos</span>
@@ -67,9 +68,9 @@ export default function Calendario({ mes, eventos, fmt, onElegir }) {
                   <span className={`icono-mini p-${e.tipo}`}><Icono aria-hidden="true" /></span>
                   <div className="lista-texto">
                     <strong>{e.nombre}</strong>
-                    <small>{TEXTO[e.tipo]}{e.pagado && ' · pagado'}</small>
+                    <small>{TEXTO[e.tipo]}{e.pagado && (e.tipo === 'ingreso' ? ' · recibido' : ' · pagado')}</small>
                   </div>
-                  {e.tipo !== 'corte' && <span className="monto">{fmt.dinero(e.monto)}</span>}
+                  {e.tipo !== 'corte' && <span className={`monto ${e.tipo === 'ingreso' ? 'texto-verde' : ''}`}>{e.tipo === 'ingreso' ? '+' : ''}{fmt.dinero(e.monto)}</span>}
                   {e.pagado && <LuCheck className="texto-verde" aria-label="Pagado" />}
                 </li>
               )

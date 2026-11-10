@@ -104,21 +104,21 @@ svg { flex-shrink: 0; }
   display: flex; justify-content: center; padding: 0 16px; pointer-events: none;
 }
 .nav-interior {
-  pointer-events: auto; position: relative; display: grid; grid-template-columns: repeat(4, 1fr);
-  width: min(100%, 420px); padding: 6px; border-radius: 26px;
+  pointer-events: auto; position: relative; display: grid; grid-template-columns: repeat(5, 1fr);
+  width: min(100%, 460px); padding: 6px; border-radius: 26px;
   background: color-mix(in srgb, #18181b 92%, transparent);
   backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
   box-shadow: var(--sombra-alta), inset 0 0 0 1px rgb(255 255 255 / 0.06);
 }
 .nav-indicador {
-  position: absolute; top: 6px; bottom: 6px; left: 6px; width: calc((100% - 12px) / 4);
+  position: absolute; top: 6px; bottom: 6px; left: 6px; width: calc((100% - 12px) / 5);
   border-radius: 20px; background: var(--acento);
   transform: translateX(calc(var(--i) * 100%)) scale(var(--visible));
   transition: transform 0.45s var(--resorte);
 }
 .navegacion button {
   position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 8px 0 7px; font-size: 11px; font-weight: 700; color: #a8a29e; transition: color 0.25s;
+  padding: 8px 0 7px; font-size: 10.5px; font-weight: 700; color: #a8a29e; transition: color 0.25s;
   min-height: 52px;
 }
 .navegacion button svg { font-size: 21px; transition: transform 0.35s var(--resorte); }
@@ -692,3 +692,30 @@ a.btn-icono { color: var(--acento-texto); }
 .nota-corte { display: block; margin-top: 4px; padding: 8px 10px; border-radius: 10px; background: #ede9fe; color: #4c1d95 !important; font-size: 12.5px; }
 @media (prefers-color-scheme: dark) { .nota-corte { background: #2e1065; color: #ddd6fe !important; } }
 .p-corte { background: #0891b2; color: #fff; }
+
+/* ---------- Ingresos ---------- */
+.reclamar { border: 2px solid color-mix(in srgb, var(--verde) 45%, transparent); background: linear-gradient(160deg, color-mix(in srgb, var(--verde) 10%, var(--superficie)), var(--superficie) 70%); }
+.reclamar h3 svg { color: var(--verde) !important; }
+.reclamar-lista li { animation: entrar 0.4s var(--suave) both; cursor: default; }
+.reclamar-botones { display: flex; gap: 6px; flex-shrink: 0; }
+.btn-mini { min-height: 38px; padding: 8px 12px; font-size: 13px; border-radius: 12px; }
+.btn-mini svg { font-size: 16px; }
+.estado-ingreso { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; font-size: 14px; background: var(--superficie-2); color: var(--texto-2); }
+.estado-ingreso.recibido { background: var(--verde); color: #fff; }
+.estado-ingreso.atrasado, .estado-ingreso.hoy { background: var(--acento); color: var(--acento-tinta); animation: latir 1.6s ease-in-out infinite; }
+.ingreso-pendiente .monto { color: var(--texto-2); }
+.texto-2 { color: var(--texto-2); }
+.editar-ingreso { margin-top: 14px; width: 100%; justify-content: center; }
+.hero .progreso { background: rgb(255 255 255 / 0.12); margin-top: 6px; }
+.p-ingreso { background: #16a34a; color: #fff; }
+.recordatorio-noche { display: flex; align-items: center; gap: 12px; }
+.recordatorio-noche > svg { font-size: 26px; color: var(--acento-texto); flex-shrink: 0; }
+.recordatorio-noche div { flex: 1; display: flex; flex-direction: column; }
+.recordatorio-noche small { color: var(--texto-2); }
+.diario { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 16px; background: var(--acento-suave); }
+.diario > svg { font-size: 20px; color: var(--acento-texto); flex-shrink: 0; }
+.diario input[type='time'] { border: 1.5px solid var(--linea); border-radius: 10px; padding: 6px 8px; background: var(--superficie); font-weight: 700; min-height: 40px; }
+.tarjeta.recordatorio-noche { flex-direction: row; padding: 14px 14px 14px 16px; border: 1.5px solid color-mix(in srgb, var(--acento) 50%, transparent); }
+.reclamar-lista li { flex-wrap: wrap; }
+.reclamar-botones { width: 100%; padding-left: 52px; }
+.reclamar-botones .btn-primario { flex: 1; }

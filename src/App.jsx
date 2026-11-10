@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import {
   LuLayoutDashboard, LuReceipt, LuCreditCard, LuTarget, LuSettings, LuPlus, LuChevronLeft, LuChevronRight,
-  LuRepeat, LuWallet, LuShoppingBag, LuFileSpreadsheet, LuBanknote, LuLandmark, LuCalculator, LuBellRing,
+  LuRepeat, LuWallet, LuShoppingBag, LuFileSpreadsheet, LuBanknote, LuLandmark, LuCalculator, LuBellRing, LuHandCoins, LuBriefcase,
 } from 'react-icons/lu'
 import { useFinanzas } from './lib/store'
 import { crearFormato, mesActual, nombreMes, sumarMeses } from './lib/format'
 import { saldoDeuda } from './lib/deudas'
 import Inicio from './views/Inicio'
 import Gastos from './views/Gastos'
+import Ingresos from './views/Ingresos'
 import Tarjetas from './views/Tarjetas'
 import Plan from './views/Plan'
 import Ajustes from './views/Ajustes'
@@ -17,10 +18,12 @@ import {
   FormGasto, FormFijo, FormIngreso, AsistenteDeuda, FormEditarDeuda, FormCompra, FormPago, Importar,
 } from './components/Formularios'
 import { MeAlcanza, Recordatorios } from './components/Herramientas'
+import { FormReclamar, FormPosponer, FormFuente, FormIngresoUnico, AccionesRecibido } from './components/IngresosUI'
 
 const PESTANAS = [
   { id: 'inicio', texto: 'Inicio', Icono: LuLayoutDashboard },
   { id: 'gastos', texto: 'Gastos', Icono: LuReceipt },
+  { id: 'ingresos', texto: 'Ingresos', Icono: LuHandCoins },
   { id: 'tarjetas', texto: 'Tarjetas', Icono: LuCreditCard },
   { id: 'plan', texto: 'Plan', Icono: LuTarget },
 ]
@@ -40,8 +43,8 @@ export default function App() {
   }
 
   const props = { datos, acciones, mes, fmt, ir, abrir }
-  const Vista = { inicio: Inicio, gastos: Gastos, tarjetas: Tarjetas, plan: Plan, ajustes: Ajustes }[vista]
-  const conMes = ['inicio', 'gastos'].includes(vista)
+  const Vista = { inicio: Inicio, gastos: Gastos, ingresos: Ingresos, tarjetas: Tarjetas, plan: Plan, ajustes: Ajustes }[vista]
+  const conMes = ['inicio', 'gastos', 'ingresos'].includes(vista)
   const tarjetas = datos.deudas.filter((d) => d.tipo === 'tarjeta')
   const conSaldo = datos.deudas.filter((d) => saldoDeuda(d) > 0)
 
@@ -101,7 +104,8 @@ export default function App() {
               { t: 'Pagar tarjeta', d: 'O cuota de crédito', I: LuWallet, f: () => (conSaldo.length === 1 ? abrir('pago', { deudaId: conSaldo[0].id }) : abrir('elegir', { siguiente: 'pago' })), oculto: !conSaldo.length },
               { t: 'Compra a cuotas', d: 'Con tarjeta de crédito', I: LuShoppingBag, f: () => (tarjetas.length === 1 ? abrir('compra', { deudaId: tarjetas[0].id }) : abrir('elegir', { siguiente: 'compra' })), oculto: !tarjetas.length },
               { t: 'Tarjeta o crédito', d: 'Agregar una nueva', I: LuLandmark, f: () => abrir('deuda-nueva') },
-              { t: 'Ingreso extra', d: 'Prima, bono, freelance', I: LuBanknote, f: () => abrir('ingreso') },
+              { t: 'Ingreso', d: 'Recibido o por recibir', I: LuBanknote, f: () => abrir('ingreso') },
+              { t: 'Ingreso fijo', d: 'Salario, quincena', I: LuBriefcase, f: () => abrir('fuente') },
               { t: '¿Me alcanza?', d: 'Antes de comprar', I: LuCalculator, f: () => abrir('alcanza') },
               { t: 'Recordatorios', d: 'Pagos en tu calendario', I: LuBellRing, f: () => abrir('recordatorios') },
               { t: 'Subir Excel', d: 'Varias cosas a la vez', I: LuFileSpreadsheet, f: () => abrir('importar') },
@@ -151,13 +155,51 @@ export default function App() {
       )}
 
       {modal?.tipo === 'ingreso' && (
-        <Hoja titulo={modal.ingreso ? 'Editar ingreso' : 'Ingreso extra'} onCerrar={cerrar}>
-          <FormIngreso
+        <Hoja titulo={modal.ingreso ? 'Editar ingreso' : 'Nuevo ingreso'} onCerrar={cerrar}>
+          <FormIngresoUnico
             mes={mes}
             inicial={modal.ingreso}
-            onGuardar={(i) => { acciones.guardarIngreso(i); cerrar(); avisar('Ingreso guardado') }}
+            onGuardar={(i) => { acciones.guardarIngreso(i); cerrar(); avisar(i.estado === 'esperado' ? 'Te avisaremos ese día' : 'Ingreso guardado') }}
             onEliminar={modal.ingreso && (() => { acciones.eliminarIngreso(modal.ingreso.id); cerrar() })}
           />
+        </Hoja>
+      )}
+
+      {modal?.tipo === 'fuente' && (
+        <Hoja titulo={modal.fuente ? `Editar ${modal.fuente.nombre}` : 'Ingreso fijo'} subtitulo="Llega cada mes o cada quincena" onCerrar={cerrar}>
+          <FormFuente
+            inicial={modal.fuente}
+            onGuardar={(f) => { acciones.guardarFuente(f); cerrar(); avisar('Ingreso fijo guardado') }}
+            onEliminar={modal.fuente && (() => { acciones.eliminarFuente(modal.fuente.id); cerrar() })}
+          />
+        </Hoja>
+      )}
+
+      {modal?.tipo === 'reclamar' && (
+        <Hoja titulo={`¿Recibiste ${modal.item.nombre}?`} onCerrar={cerrar}>
+          <FormReclamar item={modal.item} fmt={fmt} onRecibir={(x) => {
+            acciones.recibirIngreso(modal.item, x)
+            cerrar()
+            avisar(`${fmt.dinero(x.monto)} recibidos`, { texto: 'Deshacer', onClick: () => acciones.deshacerRecibo(modal.item) })
+          }} />
+        </Hoja>
+      )}
+
+      {modal?.tipo === 'posponer' && (
+        <Hoja titulo={`Posponer ${modal.item.nombre}`} onCerrar={cerrar}>
+          <FormPosponer item={modal.item} onPosponer={(f) => { acciones.posponerIngreso(modal.item, f); cerrar(); avisar('Ingreso pospuesto') }} />
+          {modal.item.extra && (
+            <button className="btn-texto editar-ingreso" onClick={() => abrir('ingreso', { ingreso: modal.item.extra })}>Editar o eliminar este ingreso</button>
+          )}
+        </Hoja>
+      )}
+
+      {modal?.tipo === 'recibido' && (
+        <Hoja titulo={modal.item.nombre} onCerrar={cerrar}>
+          <AccionesRecibido item={modal.item} fmt={fmt} onDeshacer={() => { acciones.deshacerRecibo(modal.item); cerrar(); avisar('Marcado como no recibido') }} />
+          {modal.item.extra && (
+            <button className="btn-texto editar-ingreso" onClick={() => abrir('ingreso', { ingreso: modal.item.extra })}>Editar o eliminar este ingreso</button>
+          )}
         </Hoja>
       )}
 
@@ -219,7 +261,7 @@ export default function App() {
 
       {modal?.tipo === 'recordatorios' && (
         <Hoja titulo="Recordatorios de pago" onCerrar={cerrar}>
-          <Recordatorios datos={datos} fmt={fmt} />
+          <Recordatorios datos={datos} acciones={acciones} fmt={fmt} />
         </Hoja>
       )}
 
