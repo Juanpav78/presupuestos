@@ -1,5 +1,6 @@
 import { useRef } from 'react'
-import { LuWallet, LuFileSpreadsheet, LuDownload, LuUpload, LuDatabase, LuTrash2, LuShieldCheck } from 'react-icons/lu'
+import { LuWallet, LuFileSpreadsheet, LuDownload, LuUpload, LuDatabase, LuTrash2, LuShieldCheck, LuSprout } from 'react-icons/lu'
+import Mascota from '../components/Mascota'
 import { MONEDAS, hoyISO } from '../lib/format'
 import { crearExcel, descargar } from '../lib/excel'
 import { exportar } from '../lib/importar'
@@ -35,11 +36,11 @@ export default function Ajustes({ datos, acciones, ir, abrir }) {
   return (
     <>
       <Tarjeta titulo="Tu dinero" Icono={LuWallet}>
+        <p className="nota">Tu salario y otros ingresos ahora se configuran en la pestaña <button className="btn-texto" onClick={() => ir('ingresos')}>Ingresos</button>.</p>
         <Formulario
-          key={`${datos.config.ingresoMensual}-${datos.config.presupuestoVariable}-${datos.config.moneda}`}
+          key={`${datos.config.presupuestoVariable}-${datos.config.moneda}`}
           inicial={datos.config}
           campos={[
-            { nombre: 'ingresoMensual', etiqueta: 'Ingreso mensual (lo que te llega)', tipo: 'monto', grande: true },
             { nombre: 'presupuestoVariable', etiqueta: 'Presupuesto para gastos del día a día', tipo: 'monto', ayuda: 'Comida, transporte, salidas… sin contar fijos ni tarjetas.' },
             { nombre: 'moneda', etiqueta: 'Moneda', tipo: 'segmento', opciones: Object.keys(MONEDAS).map((m) => ({ valor: m, texto: m })) },
           ]}
@@ -50,6 +51,26 @@ export default function Ajustes({ datos, acciones, ir, abrir }) {
             ir('inicio')
           }}
         />
+      </Tarjeta>
+
+      <Tarjeta titulo="Jardín (minijuego)" Icono={LuSprout}>
+        <div className="jardin-ajuste">
+          <Mascota estado={datos.config.jardin ? 'feliz' : 'tranquilo'} colorKey="oro" tamano={64} />
+          <p className="nota">Cada tarjeta se vuelve una mascota que se enferma o se alegra según cómo la cuides, y un árbol crece con tu salud financiera.</p>
+        </div>
+        <button
+          className={`interruptor ${datos.config.jardin ? 'activo' : ''}`}
+          role="switch"
+          aria-checked={!!datos.config.jardin}
+          onClick={() => {
+            const nuevo = !datos.config.jardin
+            acciones.setConfig({ jardin: nuevo })
+            if (nuevo) { avisar('¡Jardín activado! Búscalo en el botón 🌱 de arriba'); ir('jardin') }
+          }}
+        >
+          <span className="interruptor-bola" aria-hidden="true" />
+          {datos.config.jardin ? 'Activado' : 'Activar jardín'}
+        </button>
       </Tarjeta>
 
       <Tarjeta titulo="Excel" Icono={LuFileSpreadsheet}>

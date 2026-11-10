@@ -14,16 +14,27 @@ export const estadoInicial = {
     pagoDeudasMensual: 0,
     estrategia: 'avalancha',
     abonosPlaneados: [], // {id, mes, monto, anual}
+    jardin: false, // minijuego opcional
   },
-  ingresosExtra: [], // {id, nombre, monto, fecha}
+  fuentes: [], // ingresos fijos: {id, nombre, monto, frecuencia:'mensual'|'quincenal', dia, dia2, desde}
+  recibos: {}, // estado de ingresos fijos por fecha: { 'f:fuenteId:YYYY-MM:n': {estado, fecha, monto} }
+  ingresosExtra: [], // ingresos únicos: {id, nombre, monto, fecha, estado:'recibido'|'esperado', fechaOriginal}
   gastos: [], // {id, nombre, monto, categoria, fecha, deudaId?, compraId?}
   fijos: [], // {id, nombre, monto, categoria, dia}
   pagosFijos: {}, // { 'YYYY-MM': [fijoId] }
   deudas: [], // {id, nombre, tipo:'tarjeta'|'credito', color, ultimos4, cupo, tasa, tipoTasa, diaPago, compras:[]}
   pagos: [], // {id, deudaId, monto, fecha, mes, reparto, abonos, antes}
+  metas: [], // metas de ahorro: {id, nombre, objetivo, fechaMeta, icono, color, creado, aportes:[{id, monto, fecha}]}
 }
 
-const completar = (d) => ({ ...estadoInicial, ...d, config: { ...estadoInicial.config, ...d.config } })
+const completar = (d) => {
+  const datos = { ...estadoInicial, ...d, config: { ...estadoInicial.config, ...d.config } }
+  // El "ingreso mensual" de versiones anteriores pasa a ser una fuente fija (Salario)
+  if (!d.fuentes && Number(datos.config.ingresoMensual) > 0) {
+    datos.fuentes = [{ id: generarId(), nombre: 'Salario', monto: Number(datos.config.ingresoMensual), frecuencia: 'mensual', dia: 30, desde: mesDe(hoyISO()) }]
+  }
+  return datos
+}
 
 // ---------- Migraciones ----------
 const desdeV1 = (v1) => {
@@ -54,6 +65,7 @@ const desdeV1 = (v1) => {
           saldo,
           cuotas: pago > 0 ? Math.max(Math.ceil(saldo / pago), 1) : 12,
           cuotasPagadas: 0,
+          facturada: true,
           ...(esCredito && pago > 0 ? { cuotaFija: pago } : {}),
         }] : [],
       }
@@ -147,7 +159,7 @@ export function useFinanzas() {
             deudas = editarDeuda(deudas, g.deudaId, (d) => ({ ...d, compras: [...d.compras, compra] }))
           }
         }
-        const gasto = { ...g, compraId: g.deudaId ? compraId : undefined, deudaId: g.deudaId || undefined }
+        const gasto = { creado: Date.now(), ...g, compraId: g.deudaId ? compraId : undefined, deudaId: g.deudaId || undefined }
         return { ...s, deudas, gastos: upsert(s.gastos, gasto) }
       }),
     eliminarGasto: (id) =>
@@ -159,7 +171,32 @@ export function useFinanzas() {
         return { ...s, gastos: s.gastos.filter((x) => x.id !== id), deudas }
       }),
 
-    guardarIngreso: (i) => setDatos((s) => ({ ...s, ingresosExtra: upsert(s.ingresosExtra, i) })),
+    guardarIngreso: (i) => setDatos((s) => ({ ...s, ingresosExtra: upsert(s.ingresosExtra, { estado: 'recibido', ...i }) })),
+    guardarFuente: (f) => setDatos((s) => ({ ...s, fuentes: upsert(s.fuentes, { desde: mesDe(hoyISO()), ...f }) })),
+    eliminarFuente: (id) => setDatos((s) => ({ ...s, fuentes: s.fuentes.filter((x) => x.id !== id) })),
+    /** Marca un ingreso (fijo o único) como recibido. */
+    recibirIngreso: (item, { monto, fecha }) =>
+      setDatos((s) =>
+        item.tipo === 'fijo'
+          ? { ...s, recibos: { ...s.recibos, [item.id]: { ...s.recibos[item.id], estado: 'recibido', monto: Number(monto), fecha } } }
+          : { ...s, ingresosExtra: s.ingresosExtra.map((e) => (e.id === item.id ? { ...e, estado: 'recibido', monto: Number(monto), fecha, fechaOriginal: e.fechaOriginal ?? e.fecha } : e)) }
+      ),
+    /** Pospone un ingreso a otra fecha (sigue sin contar como recibido). */
+    posponerIngreso: (item, fecha) =>
+      setDatos((s) =>
+        item.tipo === 'fijo'
+          ? { ...s, recibos: { ...s.recibos, [item.id]: { ...s.recibos[item.id], estado: 'pospuesto', fecha } } }
+          : { ...s, ingresosExtra: s.ingresosExtra.map((e) => (e.id === item.id ? { ...e, fecha, fechaOriginal: e.fechaOriginal ?? e.fecha } : e)) }
+      ),
+    /** Vuelve un ingreso recibido a "por recibir". */
+    deshacerRecibo: (item) =>
+      setDatos((s) => {
+        if (item.tipo === 'fijo') {
+          const { [item.id]: _, ...resto } = s.recibos
+          return { ...s, recibos: resto }
+        }
+        return { ...s, ingresosExtra: s.ingresosExtra.map((e) => (e.id === item.id ? { ...e, estado: 'esperado' } : e)) }
+      }),
     eliminarIngreso: (id) => setDatos((s) => ({ ...s, ingresosExtra: s.ingresosExtra.filter((x) => x.id !== id) })),
 
     // ----- Gastos fijos -----
@@ -183,6 +220,7 @@ export function useFinanzas() {
           compras.push(nuevaCompra({
             nombre: esCredito ? 'Saldo del crédito' : 'Saldo anterior',
             fecha: hoyISO(),
+            facturada: true,
             monto: saldoInicial.monto,
             cuotas: n,
             ...(esCredito ? { cuotaFija: Number(saldoInicial.cuotaFija) || Math.round(cuotaFrancesa(saldoInicial.monto, tasaMensual(d), n)) } : {}),
@@ -225,7 +263,7 @@ export function useFinanzas() {
         if (!d) return s
         const mes = mesDe(fecha)
         const res = aplicarPago(d, monto, mes)
-        const pago = { id, deudaId, monto: Number(monto), fecha, mes, reparto: res.reparto, abonos: res.abonos, antes: d.compras }
+        const pago = { id, deudaId, monto: Number(monto), fecha, mes, creado: Date.now(), reparto: res.reparto, abonos: res.abonos, antes: d.compras }
         return { ...s, pagos: [...s.pagos, pago], deudas: editarDeuda(s.deudas, deudaId, (x) => ({ ...x, compras: res.compras })) }
       })
       return id
@@ -296,6 +334,14 @@ export function useFinanzas() {
           fijos: [...s.fijos, ...fijos.map((f) => ({ ...f, id: generarId() }))],
         }
       }),
+
+    // ----- Metas de ahorro -----
+    guardarMeta: (m) => setDatos((s) => ({ ...s, metas: upsert(s.metas ?? [], { creado: Date.now(), aportes: [], ...m }) })),
+    eliminarMeta: (id) => setDatos((s) => ({ ...s, metas: (s.metas ?? []).filter((m) => m.id !== id) })),
+    guardarAporte: (metaId, a) =>
+      setDatos((s) => ({ ...s, metas: (s.metas ?? []).map((m) => (m.id === metaId ? { ...m, aportes: upsert(m.aportes ?? [], { creado: Date.now(), ...a }) } : m)) })),
+    eliminarAporte: (metaId, id) =>
+      setDatos((s) => ({ ...s, metas: (s.metas ?? []).map((m) => (m.id === metaId ? { ...m, aportes: m.aportes.filter((a) => a.id !== id) } : m)) })),
 
     importar: (nuevo) => setDatos(nuevo.version === 2 ? completar(nuevo) : desdeV1(nuevo)),
     resetear: () => setDatos(estadoInicial),

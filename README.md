@@ -5,12 +5,15 @@ App web pensada para el celular para controlar tus gastos y tus tarjetas de cré
 ## Secciones
 
 - **Inicio**: cuánto te queda libre en el mes, lo que debes pagar (pagado / falta) con fechas, alertas y un **calendario** de pagos y gastos. Incluye gráficas de a dónde va tu ingreso, gastos por categoría, regla 50/30/20 y los últimos 6 meses.
+- **Ingresos**: salario e ingresos fijos (mensuales o quincenales) e ingresos únicos. Los que esperas recibir no cuentan como disponibles hasta que los confirmas: el día que llegan aparece "Dinero por reclamar" con "Lo recibí" o "Posponer".
 - **Gastos**: tiene dos pestañas.
   - *Del día a día*: gastos con categoría y medio de pago. Si pagas con tarjeta eliges las cuotas y se crea la compra en esa tarjeta.
   - *Fijos mensuales*: arriendo, servicios, suscripciones, con día de pago y check de pagado.
-- **Tarjetas**: tarjetas y créditos con su color, tipo tarjeta real. Cada tarjeta tiene sus **compras a cuotas** (cuota 3 de 12, saldo, cuota del mes) e intereses calculados con la tasa E.A. o M.V.
+- **Tarjetas**: tarjetas y créditos con su color, tipo tarjeta real, día de corte y día de pago (las compras después del corte se cobran en el extracto siguiente). Cada tarjeta tiene sus **compras a cuotas** (cuota 3 de 12, saldo, cuota del mes) e intereses calculados con la tasa E.A. o M.V.
   - **Pagar** reparte el dinero como el banco: primero intereses del mes, luego las cuotas del mes, y el excedente abona a capital de la compra más antigua. Antes de confirmar muestra el reparto, y el último pago se puede deshacer.
-- **Plan**: eliges cuánto pagar al mes y la estrategia (avalancha o bola de nieve). Muestra la fecha en que quedas libre de deudas, los intereses que te ahorras, la gráfica, cuánto pagar a cada deuda este mes y el calendario de liberación.
+- **Plan → Ahorro**: metas con fecha (fondo de emergencia sugerido, viaje, casa…), cuánto ahorrar al mes, si vas al día, aportes y retiros. Lo que ahorras se descuenta de lo libre del mes.
+- **Jardín** (opcional, en Ajustes): cada tarjeta es una mascota que se enferma o se alegra, y un árbol crece con tu salud financiera.
+- **Plan → Salir de deudas**: eliges cuánto pagar al mes y la estrategia (avalancha o bola de nieve). Muestra la fecha en que quedas libre de deudas, los intereses que te ahorras, la gráfica, cuánto pagar a cada deuda este mes y el calendario de liberación.
 - **Ajustes**: ingreso, presupuesto, moneda; **subir y descargar Excel**; respaldo JSON.
 
 ## Excel

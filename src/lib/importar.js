@@ -19,7 +19,8 @@ const ALIAS = {
   tipoTasa: ['tipotasa', 'tipodetasa'],
   pago: ['pagomensual', 'pago', 'cuota', 'valorcuota', 'cuotamensual', 'pagominimo'],
   cupo: ['cupo', 'cupototal'],
-  diaPago: ['diadepago', 'diapago', 'fechalimite', 'diadelpago', 'dia', 'diadecobro'],
+  diaPago: ['diadepago', 'diapago', 'fechalimite', 'diadelpago', 'dialimitedepago', 'dia', 'diadecobro'],
+  diaCorte: ['diadecorte', 'diacorte', 'corte', 'fechadecorte'],
   color: ['color'],
   categoria: ['categoria'],
 }
@@ -55,7 +56,8 @@ const CONTIENE = {
   tipoTasa: [['tipotasa', 'tipodetasa'], []],
   pago: [['pago', 'cuota', 'abono'], ['dia', 'fecha', 'pagad', 'cuotas']],
   cupo: [['cupo', 'limite'], ['fecha', 'dia']],
-  diaPago: [['dia', 'fechalimite', 'corte'], []],
+  diaPago: [['pago', 'limite', 'vence'], ['corte', 'pagad', 'mensual', 'minimo']],
+  diaCorte: [['corte'], []],
   categoria: [['categ', 'tipo'], []],
 }
 
@@ -131,7 +133,7 @@ export function interpretar(hojas) {
     const datos = filas.slice(iEnc + 1).filter((f) => f && f.some((c) => c !== undefined && c !== ''))
 
     if (tipo === 'deudas') {
-      const col = mapearColumnas(enc, ['tarjeta', 'tipo', 'descripcion', 'fecha', 'monto', 'cuotas', 'cuotasPagadas', 'saldo', 'tasa', 'tipoTasa', 'pago', 'cupo', 'diaPago', 'color'])
+      const col = mapearColumnas(enc, ['tarjeta', 'tipo', 'descripcion', 'fecha', 'monto', 'cuotas', 'cuotasPagadas', 'saldo', 'tasa', 'tipoTasa', 'diaCorte', 'pago', 'cupo', 'diaPago', 'color'])
       if (col.tarjeta === undefined) { avisos.push(`La hoja "${nombreHoja}" no tiene columna "Tarjeta o crédito".`); continue }
       datos.forEach((f, i) => {
         const v = (k) => (col[k] !== undefined ? f[col[k]] : undefined)
@@ -147,7 +149,7 @@ export function interpretar(hojas) {
         if (!deudas[clave]) {
           deudas[clave] = {
             nombre,
-            datos: { nombre, tipo: esCredito ? 'credito' : 'tarjeta', color: elegirColor(v('color'), Object.keys(deudas).length), tasa: tasa ?? 0, tipoTasa, cupo: numero(v('cupo')) ?? 0, diaPago: numero(v('diaPago')) ?? undefined },
+            datos: { nombre, tipo: esCredito ? 'credito' : 'tarjeta', color: elegirColor(v('color'), Object.keys(deudas).length), tasa: tasa ?? 0, tipoTasa, cupo: numero(v('cupo')) ?? 0, diaPago: numero(v('diaPago')) ?? undefined, diaCorte: numero(v('diaCorte')) ?? undefined },
             compras: [],
           }
         } else {
@@ -155,6 +157,7 @@ export function interpretar(hojas) {
           if (tasa !== undefined && !d.tasa) Object.assign(d, { tasa, tipoTasa })
           if (numero(v('cupo')) && !d.cupo) d.cupo = numero(v('cupo'))
           if (numero(v('diaPago')) && !d.diaPago) d.diaPago = numero(v('diaPago'))
+          if (numero(v('diaCorte')) && !d.diaCorte) d.diaCorte = numero(v('diaCorte'))
         }
         const d = deudas[clave].datos
         const esCreditoD = d.tipo === 'credito'
@@ -165,7 +168,7 @@ export function interpretar(hojas) {
         let cuotas = Math.round(numero(v('cuotas')) ?? 0)
         if (!monto && !saldo) {
           // Fila que solo define la tarjeta (tasa, cupo, día…): no es un error
-          const defineTarjeta = ['tasa', 'cupo', 'diaPago', 'tipo', 'color'].some((k) => col[k] !== undefined && texto(v(k)) !== '')
+          const defineTarjeta = ['tasa', 'cupo', 'diaPago', 'diaCorte', 'tipo', 'color'].some((k) => col[k] !== undefined && texto(v(k)) !== '')
           if (!defineTarjeta) avisos.push(`Fila ${iEnc + i + 2} de "${nombreHoja}": sin valor ni saldo, se omitió.`)
           return
         }
@@ -182,6 +185,7 @@ export function interpretar(hojas) {
         deudas[clave].compras.push({
           nombre: texto(v('descripcion')) || (esCreditoD ? 'Saldo del crédito' : 'Compra'),
           fecha: fecha(v('fecha')) ?? hoyISO(),
+          ...(fecha(v('fecha')) ? {} : { facturada: true }),
           monto,
           saldo: Math.round(saldo * 100) / 100,
           cuotas: Math.max(cuotas, pagadas + 1),
@@ -223,7 +227,7 @@ export function interpretar(hojas) {
 // ---------- Plantilla y exportación ----------
 // Hoja "Tarjetas": una fila por tarjeta o crédito (sus condiciones).
 // Hoja "Compras": una fila por compra o deuda; se une a su tarjeta por el nombre.
-const ENC_TARJETAS = ['Tarjeta o crédito', 'Tipo', 'Interés %', 'Tipo tasa', 'Cupo', 'Día de pago', 'Color']
+const ENC_TARJETAS = ['Tarjeta o crédito', 'Tipo', 'Interés %', 'Tipo tasa', 'Cupo', 'Día de corte', 'Día de pago', 'Color']
 const ENC_COMPRAS = ['Tarjeta o crédito', 'Descripción', 'Fecha', 'Valor', 'Cuotas', 'Cuotas pagadas', 'Saldo pendiente', 'Pago mensual']
 const ENC_GASTOS = ['Fecha', 'Descripción', 'Categoría', 'Monto']
 const ENC_FIJOS = ['Nombre', 'Monto', 'Categoría', 'Día de pago']
@@ -235,9 +239,9 @@ export function plantilla() {
       nombre: 'Tarjetas',
       filas: [
         ENC_TARJETAS,
-        ['Visa Oro', 'Tarjeta', 28.5, 'EA', 6000000, 15, 'Oro'],
-        ['Mastercard', 'Tarjeta', 2.1, 'MV', 4000000, 5, 'Negro'],
-        ['Préstamo libre inversión', 'Crédito', 18, 'EA', '', 28, 'Azul'],
+        ['Visa Oro', 'Tarjeta', 28.5, 'EA', 6000000, 30, 15, 'Oro'],
+        ['Mastercard', 'Tarjeta', 2.1, 'MV', 4000000, 20, 5, 'Negro'],
+        ['Préstamo libre inversión', 'Crédito', 18, 'EA', '', '', 28, 'Azul'],
       ],
     },
     {
@@ -257,7 +261,8 @@ export function plantilla() {
       nombre: 'Instrucciones',
       filas: [
         ['Cómo llenar este archivo'],
-        ['1. Hoja "Tarjetas": una fila por cada tarjeta o crédito, con su interés, cupo y día de pago. No lleva montos.'],
+        ['1. Hoja "Tarjetas": una fila por cada tarjeta o crédito, con su interés, cupo, día de corte y día de pago. No lleva montos.'],
+        ['   Día de corte: el día en que el banco cierra el extracto. Lo que compras después se cobra en el extracto siguiente.'],
         ['2. Hoja "Compras": una fila por cada compra. Escribe el nombre de la tarjeta igual que en la hoja Tarjetas para que se una a ella.'],
         ['   Ejemplo: la Visa Oro tiene 3 compras (Celular, Tiquetes y Mercado); lo que debes en la tarjeta es la suma de las tres.'],
         ['3. Si no tienes el detalle de compras, pon una sola fila con el "Saldo pendiente" y el "Pago mensual" (como la Mastercard).'],
@@ -276,7 +281,7 @@ export function exportar(datos) {
   return [
     {
       nombre: 'Tarjetas',
-      filas: [ENC_TARJETAS, ...datos.deudas.map((d) => [d.nombre, d.tipo === 'credito' ? 'Crédito' : 'Tarjeta', d.tasa, d.tipoTasa, d.cupo || '', d.diaPago || '', COLORES[d.color]?.nombre ?? ''])],
+      filas: [ENC_TARJETAS, ...datos.deudas.map((d) => [d.nombre, d.tipo === 'credito' ? 'Crédito' : 'Tarjeta', d.tasa, d.tipoTasa, d.cupo || '', d.diaCorte || '', d.diaPago || '', COLORES[d.color]?.nombre ?? ''])],
     },
     {
       nombre: 'Compras',

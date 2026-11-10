@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import {
   LuGift, LuPlus, LuTrash2, LuThumbsUp, LuTriangleAlert, LuCircleX, LuCalendarPlus, LuExternalLink, LuDownload,
-  LuHourglass, LuSparkles, LuCreditCard, LuRepeat,
+  LuHourglass, LuSparkles, LuCreditCard, LuRepeat, LuMoon,
 } from 'react-icons/lu'
 import { CampoMonto, Chips, Segmentado, Dato, avisar } from './UI'
 import { mesActual, nombreMes, sumarMeses, hoyISO, generarId, soloMes } from '../lib/format'
-import { cobroCompra, cobroDelMes, ordenarPorEstrategia, saldoDeuda, simularPlan, tasaMensual } from '../lib/deudas'
+import { cobroCompra, cobroDelMes, ordenarPorEstrategia, saldoDeuda, simularPlan, tasaMensual, mesPrimerCobro } from '../lib/deudas'
 import { resumenMes } from '../lib/resumen'
-import { crearICS, enlaceGoogle } from '../lib/recordatorios'
+import { crearICS, enlaceGoogle, enlaceGoogleDiario } from '../lib/recordatorios'
 import { descargar } from '../lib/excel'
 
 const textoMeses = (m) => {
@@ -154,6 +154,7 @@ export function MeAlcanza({ datos, fmt, onRegistrar }) {
     const compra = { id: '_nueva', nombre: 'Nueva compra', fecha: hoyISO(), monto: Number(monto), saldo: Number(monto), cuotas: Number(cuotas) || 1, cuotasPagadas: 0 }
     const sola = simularPlan([{ ...d, compras: [compra] }], 0, 'minimos')
     const cuota = cobroCompra(compra, tasaMensual(d)).total
+    const primerCobro = mesPrimerCobro(d, compra) ?? hoy
     const conCompra = activas.some((x) => x.id === d.id)
       ? activas.map((x) => (x.id === d.id ? { ...x, compras: [...x.compras, compra] } : x))
       : [...activas, { ...d, compras: [...d.compras, compra] }]
@@ -164,7 +165,7 @@ export function MeAlcanza({ datos, fmt, onRegistrar }) {
     return {
       cuota, interesesCompra: sola.totalIntereses, totalCompra: Number(monto) + sola.totalIntereses,
       atraso: despues.meses - antes.meses, interesesExtra: despues.totalIntereses - antes.totalIntereses,
-      subePago: Math.max(minimosNuevos - Math.max(pago, 0), 0), libreDespues: libre - cuota,
+      subePago: Math.max(minimosNuevos - Math.max(pago, 0), 0), libreDespues: primerCobro > hoy ? libre : libre - cuota, primerCobro,
       sinCupo: d.cupo > 0 && saldoDeuda(d) + Number(monto) > d.cupo, usoCupo, tarjeta: d,
     }
   }, [monto, medio, cuotas, datos])
@@ -198,7 +199,7 @@ export function MeAlcanza({ datos, fmt, onRegistrar }) {
           </div>
           {!res.efectivo && (
             <div className="datos-grid">
-              <Dato etiqueta="Cuota del primer mes" valor={fmt.dinero(res.cuota)} />
+              <Dato etiqueta={res.primerCobro > hoy ? `Primera cuota (${nombreMes(res.primerCobro, true)})` : 'Cuota de este mes'} valor={fmt.dinero(res.cuota)} />
               <Dato etiqueta="Intereses de la compra" valor={fmt.dinero(res.interesesCompra)} tono={res.interesesCompra > 0 ? 'rojo' : 'verde'} />
               <Dato etiqueta="Pagarías en total" valor={fmt.dinero(res.totalCompra)} />
               <Dato etiqueta="Libre este mes" valor={fmt.dinero(res.libreDespues)} tono={res.libreDespues < 0 ? 'rojo' : ''} />
@@ -209,6 +210,7 @@ export function MeAlcanza({ datos, fmt, onRegistrar }) {
           {!res.efectivo && Number(cuotas) > 1 && (
             <p className="nota"><LuSparkles aria-hidden="true" /> A 1 cuota normalmente no pagas intereses: te ahorrarías {fmt.dinero(res.interesesCompra)}.</p>
           )}
+          {!res.efectivo && res.primerCobro > hoy && <p className="nota-corte">Ya pasó el corte de {res.tarjeta.nombre}: esta compra se cobra en {nombreMes(res.primerCobro)}.</p>}
           {res.subePago > 0 && <p className="nota">Tu pago mensual a deudas subiría al menos {fmt.dinero(res.subePago)}.</p>}
           <button className="btn btn-secundario" onClick={() => onRegistrar({ monto: Number(monto), deudaId: medio, cuotas: Number(cuotas) })}>
             <LuCreditCard aria-hidden="true" /> La compré: registrarla
@@ -222,7 +224,7 @@ export function MeAlcanza({ datos, fmt, onRegistrar }) {
 // =====================================================================
 // 3. Recordatorios en el calendario del celular
 // =====================================================================
-export function Recordatorios({ datos, fmt }) {
+export function Recordatorios({ datos, acciones, fmt }) {
   const eventos = [
     ...datos.deudas
       .filter((d) => d.diaPago && saldoDeuda(d) > 0)
@@ -232,20 +234,31 @@ export function Recordatorios({ datos, fmt }) {
   const sinDia = datos.deudas.filter((d) => !d.diaPago && saldoDeuda(d) > 0)
   const [elegidos, setElegidos] = useState(() => new Set(eventos.map((e) => e.id)))
   const [dias, setDias] = useState(2)
+  const [diario, setDiario] = useState(true)
+  const hora = datos.config.horaRecordatorio || '20:00'
   const lista = eventos.filter((e) => elegidos.has(e.id))
+  const total = lista.length + (diario ? 1 : 0)
   const alternar = (id) => setElegidos((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
 
-  if (!eventos.length) {
-    return <p className="nota">Agrega tarjetas con día de pago o gastos fijos para crear recordatorios.</p>
-  }
   return (
     <div className="formulario">
+      <div className="diario">
+        <button className={`check ${diario ? 'marcado' : ''}`} aria-label="Incluir recordatorio diario" aria-pressed={diario} onClick={() => setDiario(!diario)}>✓</button>
+        <LuMoon aria-hidden="true" />
+        <div className="lista-texto">
+          <strong>Registrar mis gastos</strong>
+          <small>Todos los días a las</small>
+        </div>
+        <input type="time" aria-label="Hora del recordatorio diario" value={hora} onChange={(e) => acciones?.setConfig({ horaRecordatorio: e.target.value || '20:00' })} />
+        <a className="btn-icono" href={enlaceGoogleDiario(hora)} target="_blank" rel="noopener noreferrer" aria-label="Agregar recordatorio diario a Google Calendar"><LuExternalLink /></a>
+      </div>
+      {!eventos.length && <p className="nota">Agrega tarjetas con día de pago o gastos fijos para recordarte también esos pagos.</p>}
       <p className="nota">Se crean como eventos que se repiten cada mes en el calendario de tu celular, con alarma antes y el mismo día.</p>
       <div className="campo">
         <span className="campo-etiqueta">Avisarme</span>
         <Segmentado etiqueta="Días de anticipación" valor={dias} onChange={setDias} opciones={[1, 2, 3].map((n) => ({ valor: n, texto: `${n} día${n > 1 ? 's' : ''} antes` }))} />
       </div>
-      <ul className="lista compacta">
+      {eventos.length > 0 && <ul className="lista compacta">
         {eventos.map((e) => (
           <li key={e.id}>
             <button className={`check ${elegidos.has(e.id) ? 'marcado' : ''}`} aria-label={`Incluir ${e.titulo}`} aria-pressed={elegidos.has(e.id)} onClick={() => alternar(e.id)}>✓</button>
@@ -258,10 +271,10 @@ export function Recordatorios({ datos, fmt }) {
             </a>
           </li>
         ))}
-      </ul>
+      </ul>}
       {sinDia.length > 0 && <p className="nota">Sin día de pago (edítalas para incluirlas): {sinDia.map((d) => d.nombre).join(', ')}.</p>}
-      <button className="btn btn-primario" disabled={!lista.length} onClick={() => { descargar(crearICS(lista, dias), 'recordatorios-pagos.ics'); avisar('Abre el archivo para agregarlo a tu calendario') }}>
-        <LuCalendarPlus aria-hidden="true" /> Agregar {lista.length} al calendario
+      <button className="btn btn-primario" disabled={!total} onClick={() => { descargar(crearICS(lista, dias, diario ? hora : null), 'recordatorios-finanzas.ics'); avisar('Abre el archivo para agregarlo a tu calendario') }}>
+        <LuCalendarPlus aria-hidden="true" /> Agregar {total} al calendario
       </button>
       <p className="nota">
         <b>iPhone:</b> toca "Agregar todos" al abrir el archivo. <b>Android:</b> ábrelo con tu app de calendario, o usa el botón <LuExternalLink aria-label="Google Calendar" /> de cada pago para crearlo en Google Calendar.

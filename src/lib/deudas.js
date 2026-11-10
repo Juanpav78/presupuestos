@@ -30,6 +30,36 @@ export const cuotaFrancesa = (monto, tasaMes, n) => {
 }
 
 const r2 = (n) => Math.round(n * 100) / 100
+const pad2 = (n) => String(n).padStart(2, '0')
+const sumarMesD = (mes, n) => {
+  const [y, m] = mes.split('-').map(Number)
+  const d = new Date(y, m - 1 + n, 1)
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`
+}
+export const mesHoy = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`
+}
+
+/**
+ * Fecha de corte: las compras hechas después del día de corte entran en el
+ * extracto del mes siguiente. Si el día de pago es antes o igual al de corte,
+ * ese extracto se paga al mes siguiente.
+ * Devuelve el mes ('YYYY-MM') en que se cobra la primera cuota, o null si no aplica.
+ */
+export const mesPrimerCobro = (d, c) => {
+  const corte = Number(d?.diaCorte)
+  // 'facturada': saldos que ya venían en el extracto (saldo inicial, importados sin fecha)
+  if (!corte || !c?.fecha || c.facturada || Number(c.cuotasPagadas) > 0) return null
+  const [y, m, dia] = c.fecha.split('-').map(Number)
+  let mes = `${y}-${pad2(m)}`
+  if (dia > corte) mes = sumarMesD(mes, 1)
+  if (Number(d.diaPago) && Number(d.diaPago) <= corte) mes = sumarMesD(mes, 1)
+  return mes
+}
+
+/** Compras con su mes de primer cobro calculado según la fecha de corte. */
+export const comprasConCorte = (d) => (d.compras ?? []).map((c) => ({ ...c, primerCobro: mesPrimerCobro(d, c) ?? undefined }))
 
 export const saldoDeuda = (d) => (d.compras ?? []).reduce((t, c) => t + Math.max(Number(c.saldo) || 0, 0), 0)
 export const cuotasRestantes = (c) => Math.max((Number(c.cuotas) || 1) - (Number(c.cuotasPagadas) || 0), 1)
@@ -39,6 +69,7 @@ const generaInteres = (c) => Number(c.cuotas) > 1 || Number(c.cuotaFija) > 0
 export const cobroCompra = (c, r, mes) => {
   const saldo = Number(c.saldo) || 0
   if (saldo <= 0.5 || (mes && c.ultimoMesPagado === mes)) return { interes: 0, capital: 0, total: 0 }
+  if (mes && c.primerCobro && mes < c.primerCobro) return { interes: 0, capital: 0, total: 0, sinFacturar: true }
   const interes = generaInteres(c) ? saldo * r : 0
   const capital = Number(c.cuotaFija) > 0
     ? Math.min(Math.max(Number(c.cuotaFija) - interes, 0), saldo)
@@ -52,7 +83,7 @@ export const ordenarCompras = (compras) =>
 /** Pago del mes de una deuda (lo que el banco cobraría como pago mínimo). */
 export const cobroDelMes = (d, mes) => {
   const r = tasaMensual(d)
-  const detalle = ordenarCompras(d.compras ?? []).map((c) => ({ compra: c, ...cobroCompra(c, r, mes) }))
+  const detalle = ordenarCompras(comprasConCorte(d)).map((c) => ({ compra: c, ...cobroCompra(c, r, mes) }))
   const suma = (k) => r2(detalle.reduce((t, x) => t + x[k], 0))
   return { interes: suma('interes'), capital: suma('capital'), total: suma('total'), detalle }
 }
@@ -70,7 +101,7 @@ export const interesesDeuda = (d) => {
 export const aplicarPago = (d, monto, mes) => {
   const r = tasaMensual(d)
   let resto = Number(monto) || 0
-  const compras = ordenarCompras(d.compras ?? []).map((c) => ({ ...c }))
+  const compras = ordenarCompras(comprasConCorte(d))
   const reparto = { intereses: 0, cuotas: 0, abono: 0 }
   const abonos = []
 
@@ -109,6 +140,7 @@ export const aplicarPago = (d, monto, mes) => {
   }
 
   compras.forEach((c) => {
+    delete c.primerCobro
     if (c.saldo <= 0.5) {
       c.saldo = 0
       c.cuotasPagadas = Number(c.cuotas) || 1
@@ -145,9 +177,10 @@ export const simularPlan = (deudas, presupuestoMensual, estrategia = 'avalancha'
       tasa: d.tasa,
       tipoTasa: d.tipoTasa,
       r: tasaMensual(d),
-      compras: ordenarCompras(d.compras).filter((c) => c.saldo > 0.5).map((c) => ({ ...c, ultimoMesPagado: undefined })),
+      compras: ordenarCompras(comprasConCorte(d)).filter((c) => c.saldo > 0.5).map((c) => ({ ...c, ultimoMesPagado: undefined })),
     }))
 
+  const inicio = mesHoy()
   const total = () => lista.reduce((t, d) => t + d.compras.reduce((s, c) => s + c.saldo, 0), 0)
   const serie = [total()]
   const ordenPago = []
@@ -165,7 +198,8 @@ export const simularPlan = (deudas, presupuestoMensual, estrategia = 'avalancha'
     for (const d of lista) {
       for (const c of d.compras) {
         if (c.saldo <= 0.5) continue
-        const { interes, capital } = cobroCompra(c, d.r)
+        const { interes, capital, sinFacturar } = cobroCompra(c, d.r, sumarMesD(inicio, mes - 1))
+        if (sinFacturar) continue
         totalIntereses += interes
         const pagado = Math.min(disponible, interes + capital)
         disponible -= pagado
@@ -230,7 +264,7 @@ const difMeses = (a, b) => {
  */
 export const proyectar = (d, desde, n = 12) => {
   const r = tasaMensual(d)
-  const compras = ordenarCompras(d.compras ?? []).filter((c) => c.saldo > 0.5).map((c) => ({ ...c }))
+  const compras = ordenarCompras(comprasConCorte(d)).filter((c) => c.saldo > 0.5)
   const meses = []
   for (let i = 0; i < n; i++) {
     const mes = sumarMes(desde, i)
@@ -257,7 +291,7 @@ export const proyectar = (d, desde, n = 12) => {
 export const finCompras = (d, desde) => {
   const r = tasaMensual(d)
   const fin = {}
-  for (const c of d.compras ?? []) {
+  for (const c of comprasConCorte(d)) {
     if (c.saldo <= 0.5) continue
     const x = { ...c }
     fin[c.id] = null

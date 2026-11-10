@@ -27,8 +27,23 @@ const sumarDia = (iso) => {
   return `${x.getFullYear()}${pad(x.getMonth() + 1)}${pad(x.getDate())}`
 }
 
-/** eventos: [{ id, titulo, detalle, dia }] */
-export function crearICS(eventos, diasAntes = 2) {
+/** Hora 'HH:MM' de hoy (o mañana si ya pasó) en formato local de calendario. */
+const proximaHora = (hora) => {
+  const [h, m] = hora.split(':').map(Number)
+  const d = new Date()
+  if (d.getHours() * 60 + d.getMinutes() > h * 60 + m) d.setDate(d.getDate() + 1)
+  const f = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`
+  const fin = new Date(2000, 0, 1, h, m + 10)
+  return { inicio: `${f}T${pad(h)}${pad(m)}00`, fin: `${f}T${pad(fin.getHours())}${pad(fin.getMinutes())}00` }
+}
+
+export const RECORDATORIO_DIARIO = {
+  titulo: '📝 ¿Ya registraste tus gastos de hoy?',
+  detalle: 'Abre Mis Finanzas y anota lo que gastaste hoy. Toma 1 minuto.',
+}
+
+/** eventos: [{ id, titulo, detalle, dia }]; diario: 'HH:MM' para un recordatorio todos los días (opcional) */
+export function crearICS(eventos, diasAntes = 2, diario = null) {
   const ahora = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '')
   const lineas = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Mis Finanzas//ES', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH']
   for (const e of eventos) {
@@ -47,6 +62,16 @@ export function crearICS(eventos, diasAntes = 2) {
       'END:VEVENT'
     )
   }
+  if (diario) {
+    const { inicio, fin } = proximaHora(diario)
+    lineas.push(
+      'BEGIN:VEVENT', 'UID:diario-registro-misfinanzas@app', `DTSTAMP:${ahora}`,
+      `DTSTART:${inicio}`, `DTEND:${fin}`, 'RRULE:FREQ=DAILY',
+      `SUMMARY:${escICS(RECORDATORIO_DIARIO.titulo)}`, `DESCRIPTION:${escICS(RECORDATORIO_DIARIO.detalle)}`,
+      'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${escICS(RECORDATORIO_DIARIO.titulo)}`, 'TRIGGER:PT0M', 'END:VALARM',
+      'END:VEVENT'
+    )
+  }
   lineas.push('END:VCALENDAR')
   return new Blob([lineas.join('\r\n')], { type: 'text/calendar;charset=utf-8' })
 }
@@ -61,5 +86,12 @@ export function enlaceGoogle(e) {
     dates: `${compacta(inicio)}/${sumarDia(inicio)}`,
     recur: regla(e.dia),
   })
+  return `https://calendar.google.com/calendar/render?${p.toString()}`
+}
+
+/** Enlace de Google Calendar para el recordatorio diario. */
+export function enlaceGoogleDiario(hora) {
+  const { inicio, fin } = proximaHora(hora)
+  const p = new URLSearchParams({ action: 'TEMPLATE', text: RECORDATORIO_DIARIO.titulo, details: RECORDATORIO_DIARIO.detalle, dates: `${inicio}/${fin}`, recur: 'RRULE:FREQ=DAILY' })
   return `https://calendar.google.com/calendar/render?${p.toString()}`
 }

@@ -1,26 +1,31 @@
 import { useMemo, useState } from 'react'
 import {
   LuLayoutDashboard, LuReceipt, LuCreditCard, LuTarget, LuSettings, LuPlus, LuChevronLeft, LuChevronRight,
-  LuRepeat, LuWallet, LuShoppingBag, LuFileSpreadsheet, LuBanknote, LuLandmark, LuCalculator, LuBellRing,
+  LuRepeat, LuWallet, LuShoppingBag, LuFileSpreadsheet, LuBanknote, LuLandmark, LuCalculator, LuBellRing, LuHandCoins, LuBriefcase, LuSprout, LuPiggyBank,
 } from 'react-icons/lu'
 import { useFinanzas } from './lib/store'
 import { crearFormato, mesActual, nombreMes, sumarMeses } from './lib/format'
 import { saldoDeuda } from './lib/deudas'
 import Inicio from './views/Inicio'
 import Gastos from './views/Gastos'
+import Ingresos from './views/Ingresos'
 import Tarjetas from './views/Tarjetas'
 import Plan from './views/Plan'
 import Ajustes from './views/Ajustes'
+import Jardin from './views/Jardin'
 import { Hoja, Avisos, avisar } from './components/UI'
 import TarjetaVisual from './components/TarjetaVisual'
 import {
   FormGasto, FormFijo, FormIngreso, AsistenteDeuda, FormEditarDeuda, FormCompra, FormPago, Importar,
 } from './components/Formularios'
 import { MeAlcanza, Recordatorios } from './components/Herramientas'
+import { FormReclamar, FormPosponer, FormFuente, FormIngresoUnico, AccionesRecibido } from './components/IngresosUI'
+import { FormMeta, FormAporte } from './components/AhorroUI'
 
 const PESTANAS = [
   { id: 'inicio', texto: 'Inicio', Icono: LuLayoutDashboard },
   { id: 'gastos', texto: 'Gastos', Icono: LuReceipt },
+  { id: 'ingresos', texto: 'Ingresos', Icono: LuHandCoins },
   { id: 'tarjetas', texto: 'Tarjetas', Icono: LuCreditCard },
   { id: 'plan', texto: 'Plan', Icono: LuTarget },
 ]
@@ -40,8 +45,8 @@ export default function App() {
   }
 
   const props = { datos, acciones, mes, fmt, ir, abrir }
-  const Vista = { inicio: Inicio, gastos: Gastos, tarjetas: Tarjetas, plan: Plan, ajustes: Ajustes }[vista]
-  const conMes = ['inicio', 'gastos'].includes(vista)
+  const Vista = { inicio: Inicio, gastos: Gastos, ingresos: Ingresos, tarjetas: Tarjetas, plan: Plan, ajustes: Ajustes, jardin: Jardin }[vista]
+  const conMes = ['inicio', 'gastos', 'ingresos'].includes(vista)
   const tarjetas = datos.deudas.filter((d) => d.tipo === 'tarjeta')
   const conSaldo = datos.deudas.filter((d) => saldoDeuda(d) > 0)
 
@@ -51,8 +56,13 @@ export default function App() {
         <div className="cabecera-fila">
           <div className="marca">
             <span className="marca-logo" aria-hidden="true"><LuBanknote /></span>
-            <h1>{vista === 'ajustes' ? 'Ajustes' : PESTANAS.find((p) => p.id === vista)?.texto}</h1>
+            <h1>{vista === 'ajustes' ? 'Ajustes' : vista === 'jardin' ? 'Jardín' : PESTANAS.find((p) => p.id === vista)?.texto}</h1>
           </div>
+          {datos.config.jardin && (
+            <button className="btn-icono btn-jardin" aria-label="Jardín" aria-pressed={vista === 'jardin'} onClick={() => ir(vista === 'jardin' ? 'inicio' : 'jardin')}>
+              <LuSprout />
+            </button>
+          )}
           <button className="btn-icono" aria-label="Ajustes" aria-pressed={vista === 'ajustes'} onClick={() => ir(vista === 'ajustes' ? 'inicio' : 'ajustes')}>
             <LuSettings />
           </button>
@@ -78,7 +88,7 @@ export default function App() {
       )}
 
       <nav className="navegacion" aria-label="Secciones">
-        <div className="nav-interior" style={{ '--i': Math.max(PESTANAS.findIndex((p) => p.id === vista), 0), '--visible': vista === 'ajustes' ? 0 : 1 }}>
+        <div className="nav-interior" style={{ '--i': Math.max(PESTANAS.findIndex((p) => p.id === vista), 0), '--visible': PESTANAS.some((p) => p.id === vista) ? 1 : 0 }}>
           <span className="nav-indicador" aria-hidden="true" />
           {PESTANAS.map((p) => (
             <button key={p.id} className={vista === p.id ? 'activa' : ''} aria-current={vista === p.id ? 'page' : undefined} onClick={() => ir(p.id)}>
@@ -101,7 +111,9 @@ export default function App() {
               { t: 'Pagar tarjeta', d: 'O cuota de crédito', I: LuWallet, f: () => (conSaldo.length === 1 ? abrir('pago', { deudaId: conSaldo[0].id }) : abrir('elegir', { siguiente: 'pago' })), oculto: !conSaldo.length },
               { t: 'Compra a cuotas', d: 'Con tarjeta de crédito', I: LuShoppingBag, f: () => (tarjetas.length === 1 ? abrir('compra', { deudaId: tarjetas[0].id }) : abrir('elegir', { siguiente: 'compra' })), oculto: !tarjetas.length },
               { t: 'Tarjeta o crédito', d: 'Agregar una nueva', I: LuLandmark, f: () => abrir('deuda-nueva') },
-              { t: 'Ingreso extra', d: 'Prima, bono, freelance', I: LuBanknote, f: () => abrir('ingreso') },
+              { t: 'Ingreso', d: 'Recibido o por recibir', I: LuBanknote, f: () => abrir('ingreso') },
+              { t: 'Ingreso fijo', d: 'Salario, quincena', I: LuBriefcase, f: () => abrir('fuente') },
+              { t: 'Ahorrar', d: 'Aporte a una meta', I: LuPiggyBank, f: () => { const ms = datos.metas ?? []; ms.length === 1 ? abrir('aporte', { metaId: ms[0].id }) : ms.length ? abrir('elegir-meta') : abrir('meta') } },
               { t: '¿Me alcanza?', d: 'Antes de comprar', I: LuCalculator, f: () => abrir('alcanza') },
               { t: 'Recordatorios', d: 'Pagos en tu calendario', I: LuBellRing, f: () => abrir('recordatorios') },
               { t: 'Subir Excel', d: 'Varias cosas a la vez', I: LuFileSpreadsheet, f: () => abrir('importar') },
@@ -151,13 +163,51 @@ export default function App() {
       )}
 
       {modal?.tipo === 'ingreso' && (
-        <Hoja titulo={modal.ingreso ? 'Editar ingreso' : 'Ingreso extra'} onCerrar={cerrar}>
-          <FormIngreso
+        <Hoja titulo={modal.ingreso ? 'Editar ingreso' : 'Nuevo ingreso'} onCerrar={cerrar}>
+          <FormIngresoUnico
             mes={mes}
             inicial={modal.ingreso}
-            onGuardar={(i) => { acciones.guardarIngreso(i); cerrar(); avisar('Ingreso guardado') }}
+            onGuardar={(i) => { acciones.guardarIngreso(i); cerrar(); avisar(i.estado === 'esperado' ? 'Te avisaremos ese día' : 'Ingreso guardado') }}
             onEliminar={modal.ingreso && (() => { acciones.eliminarIngreso(modal.ingreso.id); cerrar() })}
           />
+        </Hoja>
+      )}
+
+      {modal?.tipo === 'fuente' && (
+        <Hoja titulo={modal.fuente ? `Editar ${modal.fuente.nombre}` : 'Ingreso fijo'} subtitulo="Llega cada mes o cada quincena" onCerrar={cerrar}>
+          <FormFuente
+            inicial={modal.fuente}
+            onGuardar={(f) => { acciones.guardarFuente(f); cerrar(); avisar('Ingreso fijo guardado') }}
+            onEliminar={modal.fuente && (() => { acciones.eliminarFuente(modal.fuente.id); cerrar() })}
+          />
+        </Hoja>
+      )}
+
+      {modal?.tipo === 'reclamar' && (
+        <Hoja titulo={`¿Recibiste ${modal.item.nombre}?`} onCerrar={cerrar}>
+          <FormReclamar item={modal.item} fmt={fmt} onRecibir={(x) => {
+            acciones.recibirIngreso(modal.item, x)
+            cerrar()
+            avisar(`${fmt.dinero(x.monto)} recibidos`, { texto: 'Deshacer', onClick: () => acciones.deshacerRecibo(modal.item) })
+          }} />
+        </Hoja>
+      )}
+
+      {modal?.tipo === 'posponer' && (
+        <Hoja titulo={`Posponer ${modal.item.nombre}`} onCerrar={cerrar}>
+          <FormPosponer item={modal.item} onPosponer={(f) => { acciones.posponerIngreso(modal.item, f); cerrar(); avisar('Ingreso pospuesto') }} />
+          {modal.item.extra && (
+            <button className="btn-texto editar-ingreso" onClick={() => abrir('ingreso', { ingreso: modal.item.extra })}>Editar o eliminar este ingreso</button>
+          )}
+        </Hoja>
+      )}
+
+      {modal?.tipo === 'recibido' && (
+        <Hoja titulo={modal.item.nombre} onCerrar={cerrar}>
+          <AccionesRecibido item={modal.item} fmt={fmt} onDeshacer={() => { acciones.deshacerRecibo(modal.item); cerrar(); avisar('Marcado como no recibido') }} />
+          {modal.item.extra && (
+            <button className="btn-texto editar-ingreso" onClick={() => abrir('ingreso', { ingreso: modal.item.extra })}>Editar o eliminar este ingreso</button>
+          )}
         </Hoja>
       )}
 
@@ -205,8 +255,53 @@ export default function App() {
             <FormPago deuda={d} fmt={fmt} onPagar={(m, f) => {
               const id = acciones.pagarDeuda(d.id, m, f)
               cerrar()
-              avisar(`Pago de ${fmt.dinero(m)} aplicado`, { texto: 'Deshacer', onClick: () => { acciones.deshacerPago(id); avisar('Pago revertido') } })
+              avisar(datos.config.jardin ? `¡${d.nombre} está feliz! Pago de ${fmt.dinero(m)} aplicado 💛` : `Pago de ${fmt.dinero(m)} aplicado`, { texto: 'Deshacer', onClick: () => { acciones.deshacerPago(id); avisar('Pago revertido') } })
             }} />
+          </Hoja>
+        )
+      })()}
+
+      {modal?.tipo === 'meta' && (
+        <Hoja titulo={modal.inicial?.id ? 'Editar meta' : 'Nueva meta de ahorro'} onCerrar={cerrar}>
+          <FormMeta
+            inicial={modal.inicial}
+            fmt={fmt}
+            onGuardar={(m) => { acciones.guardarMeta(m); cerrar(); avisar(modal.inicial?.id ? 'Meta actualizada' : '¡Meta creada! A ahorrar') }}
+            onEliminar={modal.inicial?.id && (() => { acciones.eliminarMeta(modal.inicial.id); cerrar() })}
+          />
+        </Hoja>
+      )}
+
+      {modal?.tipo === 'elegir-meta' && (
+        <Hoja titulo="¿A qué meta?" onCerrar={cerrar}>
+          <ul className="lista">
+            {(datos.metas ?? []).map((m) => (
+              <li key={m.id} onClick={() => abrir('aporte', { metaId: m.id })}>
+                <span className="icono-cat" style={{ '--c': '#10B981' }}><LuPiggyBank /></span>
+                <div className="lista-texto"><strong>{m.nombre}</strong><small>Meta {fmt.dinero(m.objetivo)}</small></div>
+              </li>
+            ))}
+          </ul>
+        </Hoja>
+      )}
+
+      {modal?.tipo === 'aporte' && (() => {
+        const m = (datos.metas ?? []).find((x) => x.id === modal.metaId)
+        return m && (
+          <Hoja titulo={m.nombre} subtitulo={modal.aporte ? 'Editar movimiento' : modal.retiro ? 'Retirar dinero' : 'Agregar ahorro'} onCerrar={cerrar}>
+            <FormAporte
+              meta={m}
+              retiro={modal.retiro}
+              inicial={modal.aporte}
+              fmt={fmt}
+              onGuardar={(a) => {
+                acciones.guardarAporte(m.id, a)
+                cerrar()
+                const total = (m.aportes ?? []).filter((x) => x.id !== a.id).reduce((t, x) => t + x.monto, 0) + a.monto
+                avisar(total >= m.objetivo ? `🎉 ¡Cumpliste tu meta ${m.nombre}!` : a.monto < 0 ? 'Retiro registrado' : `${fmt.dinero(a.monto)} ahorrados`)
+              }}
+              onEliminar={modal.aporte && (() => { acciones.eliminarAporte(m.id, modal.aporte.id); cerrar() })}
+            />
           </Hoja>
         )
       })()}
@@ -219,7 +314,7 @@ export default function App() {
 
       {modal?.tipo === 'recordatorios' && (
         <Hoja titulo="Recordatorios de pago" onCerrar={cerrar}>
-          <Recordatorios datos={datos} fmt={fmt} />
+          <Recordatorios datos={datos} acciones={acciones} fmt={fmt} />
         </Hoja>
       )}
 

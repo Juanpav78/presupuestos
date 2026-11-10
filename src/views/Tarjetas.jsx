@@ -4,7 +4,7 @@ import {
   LuTriangleAlert, LuHistory, LuTarget, LuChevronDown, LuCalendarRange, LuCircleCheck, LuCalculator,
 } from 'react-icons/lu'
 import { formatFecha, mesActual, mesDe, nombreMes, soloMes, pct } from '../lib/format'
-import { cobroDelMes, cobroCompra, finCompras, interesesDeuda, ordenarCompras, proyectar, saldoDeuda, simularPlan, tasaEA, tasaMensual } from '../lib/deudas'
+import { cobroDelMes, cobroCompra, comprasConCorte, finCompras, interesesDeuda, ordenarCompras, proyectar, saldoDeuda, simularPlan, tasaEA, tasaMensual } from '../lib/deudas'
 import { resumenMes } from '../lib/resumen'
 import { Tarjeta, Vacio, Dato, NumeroAnimado, avisar, Segmentado } from '../components/UI'
 import { Progreso, Barras, Leyenda } from '../components/Graficas'
@@ -106,6 +106,11 @@ function Detalle({ datos, acciones, fmt, abrir, deuda, volver }) {
         {cobro.total > 0 && (
           <p className="nota">Este mes: {fmt.dinero(cobro.capital)} de cuotas + {fmt.dinero(cobro.interes)} de intereses. Vence el día {deuda.diaPago || '—'}.</p>
         )}
+        {esTarjeta && (deuda.diaCorte ? (
+          <p className="nota">Corte el día <b>{deuda.diaCorte}</b>: lo que compres desde el día {Number(deuda.diaCorte) + 1 > 31 ? 1 : Number(deuda.diaCorte) + 1} se cobra en el siguiente extracto.</p>
+        ) : (
+          <p className="nota">Agrega el <button className="btn-texto" onClick={() => abrir('deuda-editar', { deudaId: deuda.id })}>día de corte</button> para saber en qué extracto entra cada compra.</p>
+        ))}
         {solo && !solo.atascada && (
           <p className="nota">Pagando solo lo del mes terminas en <b>{solo.meses} meses</b> y pagas <b className="texto-rojo">{fmt.dinero(solo.totalIntereses)}</b> en intereses.</p>
         )}
@@ -160,7 +165,7 @@ function ListaCompras({ deuda, fmt, abrir }) {
   const esTarjeta = deuda.tipo !== 'credito'
   const [orden, setOrden] = useState('fecha')
   const [verTerminadas, setVerTerminadas] = useState(false)
-  const todas = ordenarCompras(deuda.compras)
+  const todas = ordenarCompras(comprasConCorte(deuda))
   const activas = todas.filter((c) => c.saldo > 0.5)
   const terminadas = todas.filter((c) => c.saldo <= 0.5)
   const fin = finCompras(deuda, mes)
@@ -182,7 +187,8 @@ function ListaCompras({ deuda, fmt, abrir }) {
     const restantes = Math.max(n - pag, 0)
     const col = colorDe(c.nombre)
     const insignias = []
-    if (mesDe(c.fecha) === mes) insignias.push(['Nueva', 'nueva'])
+    if (mesDe(c.fecha) === mes && !c.facturada) insignias.push(['Nueva', 'nueva'])
+    if (c.primerCobro && c.primerCobro > mes) insignias.push([`Se cobra en ${nombreMes(c.primerCobro, true)}`, 'corte'])
     if (n === 1) insignias.push(['Sin interés', 'verde'])
     else if (restantes === 1) insignias.push(['Última cuota', 'acento'])
     if (fin[c.id] && n > 1) insignias.push([`Termina ${nombreMes(fin[c.id], true)}`, ''])
@@ -197,7 +203,7 @@ function ListaCompras({ deuda, fmt, abrir }) {
           </div>
           <div className="compra-fila sub">
             <small>{formatFecha(c.fecha, true)} · {fmt.dinero(c.monto)}</small>
-            <small>{cc.total > 0 ? <>Este mes <b>{fmt.dinero(cc.total)}</b></> : <span className="texto-verde">Mes pagado ✓</span>}</small>
+            <small>{cc.total > 0 ? <>Este mes <b>{fmt.dinero(cc.total)}</b></> : cc.sinFacturar ? <span>Próximo extracto</span> : <span className="texto-verde">Mes pagado ✓</span>}</small>
           </div>
           <div className="cuotas-barra" aria-label={`${pag} de ${n} cuotas pagadas`}>
             {n <= 36

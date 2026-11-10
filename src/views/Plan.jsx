@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
-import { LuMountain, LuSnowflake, LuTarget, LuCalendarCheck, LuLightbulb, LuTrophy, LuCreditCard, LuCalculator, LuBellRing, LuGift } from 'react-icons/lu'
+import { useMemo, useState } from 'react'
+import Ahorro from './Ahorro'
+import { LuMountain, LuSnowflake, LuTarget, LuCalendarCheck, LuLightbulb, LuTrophy, LuCreditCard, LuCalculator, LuBellRing, LuGift, LuPiggyBank } from 'react-icons/lu'
 import { mesActual, nombreMes, sumarMeses, color } from '../lib/format'
 import { cobroDelMes, ordenarPorEstrategia, saldoDeuda, simularPlan, tasaEA } from '../lib/deudas'
 import { resumenMes } from '../lib/resumen'
@@ -14,7 +15,24 @@ const textoMeses = (m) => {
   return `${a} ${a === 1 ? 'año' : 'años'}${r ? ` y ${r} ${r === 1 ? 'mes' : 'meses'}` : ''}`
 }
 
-export default function Plan({ datos, acciones, fmt, abrir }) {
+export default function Plan(props) {
+  const [seccion, setSeccion] = useState('deudas')
+  return (
+    <>
+      <Segmentado
+        etiqueta="Tipo de plan"
+        valor={seccion}
+        onChange={setSeccion}
+        opciones={[{ valor: 'deudas', texto: 'Salir de deudas', Icono: LuTarget }, { valor: 'ahorro', texto: 'Ahorro', Icono: LuPiggyBank }]}
+      />
+      <div className="vista" key={seccion}>
+        {seccion === 'deudas' ? <PlanDeudas {...props} /> : <Ahorro {...props} />}
+      </div>
+    </>
+  )
+}
+
+function PlanDeudas({ datos, acciones, fmt, abrir }) {
   const hoy = mesActual()
   const r = resumenMes(datos, hoy)
   const activas = datos.deudas.filter((d) => saldoDeuda(d) > 0.5)
