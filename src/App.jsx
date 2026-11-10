@@ -1,151 +1,82 @@
-import { useState, useEffect } from 'react'
-import { generarId } from './helpers'
-import 'normalize.css'
-import Header from './components/Header'
-import Modal from './components/Modal'
-import ListadoGastos from './components/ListadoGastos'
-import Filtros from './components/Filtros'
-import IconoNuevoGasto from './img/nuevo-gasto.svg'
+import { useMemo, useState } from 'react'
+import { useFinanzas } from './lib/store'
+import { crearFormato, mesActual, nombreMes, sumarMeses } from './lib/format'
+import Inicio from './views/Inicio'
+import Gastos, { FormGasto } from './views/Gastos'
+import Fijos from './views/Fijos'
+import Deudas from './views/Deudas'
+import Plan from './views/Plan'
+import Ajustes from './views/Ajustes'
+import { Hoja } from './components/UI'
 
+const PESTANAS = [
+  { id: 'inicio', texto: 'Inicio', icono: '🏠' },
+  { id: 'gastos', texto: 'Gastos', icono: '🧾' },
+  { id: 'fijos', texto: 'Fijos', icono: '📅' },
+  { id: 'deudas', texto: 'Deudas', icono: '💳' },
+  { id: 'plan', texto: 'Plan', icono: '🎯' },
+]
 
-function App() {
-    
-  const [gastos, setGastos] = useState(
-    localStorage.getItem('gastos') ? JSON.parse(localStorage.getItem('gastos')) : []
-  )
+export default function App() {
+  const [datos, acciones] = useFinanzas()
+  const [vista, setVista] = useState('inicio')
+  const [mes, setMes] = useState(mesActual())
+  const [nuevoGasto, setNuevoGasto] = useState(false)
+  const fmt = useMemo(() => crearFormato(datos.config.moneda), [datos.config.moneda])
 
-  const [presupuesto, setPresupuesto] = useState(
-    Number(localStorage.getItem('presupuesto')) ?? 0
-  );
-  const [isValidPresupuesto, setIsValidPresupuesto] =useState(false)
+  const props = { datos, acciones, mes, fmt, ir: setVista }
+  const Vista = { inicio: Inicio, gastos: Gastos, fijos: Fijos, deudas: Deudas, plan: Plan, ajustes: Ajustes }[vista]
 
-  const [modal, setModal] = useState(false)
-  const [animar, setAnimar] = useState(false)
-
-  const [gastoEditar, setGastoEditar] = useState({})
-  const [filtro, setFiltro]=useState('')
-  const [gastosFiltro, setGastosFiltro]=useState([])
-  
-  useEffect(()=>{
-    if(Object.keys(gastoEditar).length > 0){
-      setModal(true)
-    
-    setTimeout(()=>{
-      setAnimar(true)
-    },200);
-    }
-  }, [gastoEditar])
-
-  useEffect(()=>{
-    localStorage.setItem('presupuesto', presupuesto ?? 0)
-  },[presupuesto])
-
-  useEffect(()=>{
-    localStorage.setItem('gastos', JSON.stringify(gastos) ?? [])
-
-  }, [gastos])
-
-  useEffect(()=>{   
-    const presupuestoLS = Number(localStorage.getItem('presupuesto')) ?? 0;
-
-    if (presupuestoLS > 0){
-      setIsValidPresupuesto(true)
-    }
-  },[])
-
-  useEffect(() =>{
-    if(filtro){
-      const gastosFiltrados = gastos.filter(gasto => gasto.categoria === filtro);
-      setGastosFiltro(gastosFiltrados);
-    }
-  }, [filtro])
-  
-
-  const handleNuevoGasto =()=>{
-    setModal(true)
-    setGastoEditar({})
-    setTimeout(()=>{
-      setAnimar(true)
-    },200);
-  }
-
-  const guardarGasto = gasto =>{
-
-    if(gasto.id){
-      const gastosActualizados = gastos.map(gastoState => gastoState.id=== gasto.id ?gasto : gastoState)
-      setGastos(gastosActualizados)
-    }else{
-      gasto.id = generarId();
-      gasto.fecha= Date.now();
-      setGastos([...gastos, gasto])
-    }
-
-    setAnimar(false);
-    setTimeout(()=>{
-      setModal(false);
-    },300);
-  }
-
-  const eliminarGasto = id =>{
-   const gastosActualizados = gastos.filter(gasto => gasto.id !== id);
-   setGastos(gastosActualizados)
-  }
   return (
-    
-    <div className={modal ? "fijar" : ""}>
-      <Header 
-      presupuesto ={presupuesto}
-      setPresupuesto = {setPresupuesto}
-      isValidPresupuesto = {isValidPresupuesto}
-      setIsValidPresupuesto={setIsValidPresupuesto}
-      gastos = {gastos}
-      setGastos = {setGastos}
-      />
-
-      {isValidPresupuesto && (
-        <>
-        
-        <main>
-          <Filtros
-          filtro = {filtro}
-          setFiltro = {setFiltro}
-          />
-          <ListadoGastos 
-          gastos = {gastos}
-          setGastoEditar = {setGastoEditar}
-          eliminarGasto = {eliminarGasto }
-          gastosFiltro ={gastosFiltro}
-          filtro = {filtro}
-          />
-        </main>
-        
-        <div className='nuevo-gasto'>
-          <img 
-          src={IconoNuevoGasto} 
-          alt="Mas Plus Cruz nuevo gasto"
-          onClick={handleNuevoGasto}
-          />
+    <div className="app">
+      <header className="cabecera">
+        <div className="cabecera-fila">
+          <h1>Mis Finanzas</h1>
+          <button className="btn-icono" aria-label="Ajustes" onClick={() => setVista(vista === 'ajustes' ? 'inicio' : 'ajustes')}>
+            ⚙️
+          </button>
         </div>
-        </>
-        
+        {vista !== 'ajustes' && vista !== 'plan' && (
+          <div className="selector-mes">
+            <button onClick={() => setMes(sumarMeses(mes, -1))} aria-label="Mes anterior">‹</button>
+            <span>{nombreMes(mes)}</span>
+            <button onClick={() => setMes(sumarMeses(mes, 1))} aria-label="Mes siguiente">›</button>
+            {mes !== mesActual() && (
+              <button className="hoy" onClick={() => setMes(mesActual())}>Hoy</button>
+            )}
+          </div>
+        )}
+      </header>
+
+      <main className="contenido">
+        <Vista {...props} />
+      </main>
+
+      {vista !== 'ajustes' && (
+        <button className="fab" onClick={() => setNuevoGasto(true)} aria-label="Nuevo gasto">＋</button>
       )}
 
-      {modal && (
-        <Modal 
-        setModal = {setModal}
-        animar = {animar}
-        setAnimar = {setAnimar}
-        guardarGasto ={guardarGasto}
-        gastoEditar = {gastoEditar}
-        setGastoEditar ={setGastoEditar}
-        />
+      <nav className="navegacion">
+        {PESTANAS.map((p) => (
+          <button key={p.id} className={vista === p.id ? 'activa' : ''} onClick={() => setVista(p.id)}>
+            <span>{p.icono}</span>
+            {p.texto}
+          </button>
+        ))}
+      </nav>
+
+      {nuevoGasto && (
+        <Hoja titulo="Nuevo gasto" onCerrar={() => setNuevoGasto(false)}>
+          <FormGasto
+            datos={datos}
+            mes={mes}
+            onGuardar={(g) => {
+              acciones.guardarGasto(g)
+              setNuevoGasto(false)
+            }}
+          />
+        </Hoja>
       )}
-
-      
-
     </div>
-  
   )
 }
-
-export default App
