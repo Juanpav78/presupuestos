@@ -8,7 +8,7 @@ App web pensada para el celular para controlar tus gastos y tus tarjetas de cré
 - **Gastos**: tiene dos pestañas.
   - *Del día a día*: gastos con categoría y medio de pago. Si pagas con tarjeta eliges las cuotas y se crea la compra en esa tarjeta.
   - *Fijos mensuales*: arriendo, servicios, suscripciones, con día de pago y check de pagado.
-- **Tarjetas**: tarjetas y créditos con su color, tipo tarjeta real. Cada tarjeta tiene sus **compras a cuotas** (cuota 3 de 12, saldo, cuota del mes) e intereses calculados con la tasa E.A. o M.V.
+- **Tarjetas**: tarjetas y créditos con su color, tipo tarjeta real, día de corte y día de pago (las compras después del corte se cobran en el extracto siguiente). Cada tarjeta tiene sus **compras a cuotas** (cuota 3 de 12, saldo, cuota del mes) e intereses calculados con la tasa E.A. o M.V.
   - **Pagar** reparte el dinero como el banco: primero intereses del mes, luego las cuotas del mes, y el excedente abona a capital de la compra más antigua. Antes de confirmar muestra el reparto, y el último pago se puede deshacer.
 - **Plan**: eliges cuánto pagar al mes y la estrategia (avalancha o bola de nieve). Muestra la fecha en que quedas libre de deudas, los intereses que te ahorras, la gráfica, cuánto pagar a cada deuda este mes y el calendario de liberación.
 - **Ajustes**: ingreso, presupuesto, moneda; **subir y descargar Excel**; respaldo JSON.

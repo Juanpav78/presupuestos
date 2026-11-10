@@ -687,3 +687,8 @@ input[type='range']::-moz-range-thumb { width: 22px; height: 22px; border-radius
 .vd-cabeza span { font-size: 14px; color: var(--texto-2); }
 a.btn-icono { color: var(--acento-texto); }
 .campo-columna { display: flex; flex-direction: column; gap: 12px; }
+.insignias em.corte { background: #ede9fe; color: #5b21b6; }
+@media (prefers-color-scheme: dark) { .insignias em.corte { background: #3b0764; color: #ddd6fe; } }
+.nota-corte { display: block; margin-top: 4px; padding: 8px 10px; border-radius: 10px; background: #ede9fe; color: #4c1d95 !important; font-size: 12.5px; }
+@media (prefers-color-scheme: dark) { .nota-corte { background: #2e1065; color: #ddd6fe !important; } }
+.p-corte { background: #0891b2; color: #fff; }

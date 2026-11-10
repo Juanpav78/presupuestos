@@ -54,6 +54,7 @@ const desdeV1 = (v1) => {
           saldo,
           cuotas: pago > 0 ? Math.max(Math.ceil(saldo / pago), 1) : 12,
           cuotasPagadas: 0,
+          facturada: true,
           ...(esCredito && pago > 0 ? { cuotaFija: pago } : {}),
         }] : [],
       }
@@ -183,6 +184,7 @@ export function useFinanzas() {
           compras.push(nuevaCompra({
             nombre: esCredito ? 'Saldo del crédito' : 'Saldo anterior',
             fecha: hoyISO(),
+            facturada: true,
             monto: saldoInicial.monto,
             cuotas: n,
             ...(esCredito ? { cuotaFija: Number(saldoInicial.cuotaFija) || Math.round(cuotaFrancesa(saldoInicial.monto, tasaMensual(d), n)) } : {}),

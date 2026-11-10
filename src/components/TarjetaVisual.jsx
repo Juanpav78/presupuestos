@@ -39,7 +39,7 @@ export default function TarjetaVisual({ deuda, fmt, onClick, mes = mesActual(), 
         <span>
           {cobro.total > 0 ? <>Pago del mes <b>{fmt.dinero(cobro.total)}</b></> : saldo > 0 ? 'Mes al día ✓' : 'Sin saldo'}
         </span>
-        <span>{deuda.diaPago ? `Vence día ${deuda.diaPago}` : ''}</span>
+        <span>{[deuda.diaCorte && `Corte ${deuda.diaCorte}`, deuda.diaPago && `Vence ${deuda.diaPago}`].filter(Boolean).join(' · ')}</span>
       </div>
     </Etiqueta>
   )

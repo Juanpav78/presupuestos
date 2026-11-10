@@ -5,7 +5,7 @@ import {
 } from 'react-icons/lu'
 import { CampoMonto, Chips, Segmentado, Dato, avisar } from './UI'
 import { mesActual, nombreMes, sumarMeses, hoyISO, generarId, soloMes } from '../lib/format'
-import { cobroCompra, cobroDelMes, ordenarPorEstrategia, saldoDeuda, simularPlan, tasaMensual } from '../lib/deudas'
+import { cobroCompra, cobroDelMes, ordenarPorEstrategia, saldoDeuda, simularPlan, tasaMensual, mesPrimerCobro } from '../lib/deudas'
 import { resumenMes } from '../lib/resumen'
 import { crearICS, enlaceGoogle } from '../lib/recordatorios'
 import { descargar } from '../lib/excel'
@@ -154,6 +154,7 @@ export function MeAlcanza({ datos, fmt, onRegistrar }) {
     const compra = { id: '_nueva', nombre: 'Nueva compra', fecha: hoyISO(), monto: Number(monto), saldo: Number(monto), cuotas: Number(cuotas) || 1, cuotasPagadas: 0 }
     const sola = simularPlan([{ ...d, compras: [compra] }], 0, 'minimos')
     const cuota = cobroCompra(compra, tasaMensual(d)).total
+    const primerCobro = mesPrimerCobro(d, compra) ?? hoy
     const conCompra = activas.some((x) => x.id === d.id)
       ? activas.map((x) => (x.id === d.id ? { ...x, compras: [...x.compras, compra] } : x))
       : [...activas, { ...d, compras: [...d.compras, compra] }]
@@ -164,7 +165,7 @@ export function MeAlcanza({ datos, fmt, onRegistrar }) {
     return {
       cuota, interesesCompra: sola.totalIntereses, totalCompra: Number(monto) + sola.totalIntereses,
       atraso: despues.meses - antes.meses, interesesExtra: despues.totalIntereses - antes.totalIntereses,
-      subePago: Math.max(minimosNuevos - Math.max(pago, 0), 0), libreDespues: libre - cuota,
+      subePago: Math.max(minimosNuevos - Math.max(pago, 0), 0), libreDespues: primerCobro > hoy ? libre : libre - cuota, primerCobro,
       sinCupo: d.cupo > 0 && saldoDeuda(d) + Number(monto) > d.cupo, usoCupo, tarjeta: d,
     }
   }, [monto, medio, cuotas, datos])
@@ -198,7 +199,7 @@ export function MeAlcanza({ datos, fmt, onRegistrar }) {
           </div>
           {!res.efectivo && (
             <div className="datos-grid">
-              <Dato etiqueta="Cuota del primer mes" valor={fmt.dinero(res.cuota)} />
+              <Dato etiqueta={res.primerCobro > hoy ? `Primera cuota (${nombreMes(res.primerCobro, true)})` : 'Cuota de este mes'} valor={fmt.dinero(res.cuota)} />
               <Dato etiqueta="Intereses de la compra" valor={fmt.dinero(res.interesesCompra)} tono={res.interesesCompra > 0 ? 'rojo' : 'verde'} />
               <Dato etiqueta="Pagarías en total" valor={fmt.dinero(res.totalCompra)} />
               <Dato etiqueta="Libre este mes" valor={fmt.dinero(res.libreDespues)} tono={res.libreDespues < 0 ? 'rojo' : ''} />
@@ -209,6 +210,7 @@ export function MeAlcanza({ datos, fmt, onRegistrar }) {
           {!res.efectivo && Number(cuotas) > 1 && (
             <p className="nota"><LuSparkles aria-hidden="true" /> A 1 cuota normalmente no pagas intereses: te ahorrarías {fmt.dinero(res.interesesCompra)}.</p>
           )}
+          {!res.efectivo && res.primerCobro > hoy && <p className="nota-corte">Ya pasó el corte de {res.tarjeta.nombre}: esta compra se cobra en {nombreMes(res.primerCobro)}.</p>}
           {res.subePago > 0 && <p className="nota">Tu pago mensual a deudas subiría al menos {fmt.dinero(res.subePago)}.</p>}
           <button className="btn btn-secundario" onClick={() => onRegistrar({ monto: Number(monto), deudaId: medio, cuotas: Number(cuotas) })}>
             <LuCreditCard aria-hidden="true" /> La compré: registrarla

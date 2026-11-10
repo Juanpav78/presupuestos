@@ -2,7 +2,7 @@ import {
   LuTriangleAlert, LuCalendarDays, LuChartPie, LuChartColumn, LuScale, LuCreditCard, LuRepeat, LuCheck,
   LuSparkles, LuArrowRight, LuWallet, LuBellRing,
 } from 'react-icons/lu'
-import { mesActual, soloMes, nombreMes, pct, formatFecha, hoyISO, color } from '../lib/format'
+import { mesActual, soloMes, nombreMes, pct, formatFecha, hoyISO, color, fechaEnMes } from '../lib/format'
 import { historico, resumenMes, vencimientos } from '../lib/resumen'
 import { saldoDeuda, cobroDelMes, interesesDeuda } from '../lib/deudas'
 import { infoCategoria, IconoCategoria } from '../lib/categorias'
@@ -46,11 +46,13 @@ export default function Inicio({ datos, acciones, mes, fmt, ir, abrir }) {
   const eventos = [
     ...venc.map((v) => ({ ...v, tipo: v.tipo })),
     ...r.gastosMes.map((g) => ({ tipo: 'gasto', fecha: g.fecha, nombre: g.nombre, monto: g.monto, id: g.id })),
+    ...datos.deudas.filter((d) => d.diaCorte && d.tipo !== 'credito').map((d) => ({ tipo: 'corte', id: d.id, fecha: fechaEnMes(mes, d.diaCorte), nombre: `Corte ${d.nombre}`, monto: 0 })),
   ]
 
   const tocarVencimiento = (v) => {
     if (v.tipo === 'deuda') abrir('pago', { deudaId: v.id })
     else if (v.tipo === 'fijo') acciones.togglePagoFijo(mes, v.id)
+    else if (v.tipo === 'corte') ir('tarjetas')
     else abrir('gasto', { gasto: datos.gastos.find((g) => g.id === v.id) })
   }
 

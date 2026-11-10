@@ -6,8 +6,8 @@ import {
 import { Formulario, CampoMonto, Chips, Segmentado, SelectorColor, avisar } from './UI'
 import TarjetaVisual from './TarjetaVisual'
 import { CATEGORIAS, IconoCategoria } from '../lib/categorias'
-import { hoyISO, mesActual, mesDe, formatFecha, degradado } from '../lib/format'
-import { aplicarPago, cobroDelMes, cuotaFrancesa, saldoDeuda, tasaMensual } from '../lib/deudas'
+import { hoyISO, mesActual, mesDe, formatFecha, degradado, nombreMes } from '../lib/format'
+import { aplicarPago, cobroDelMes, cuotaFrancesa, saldoDeuda, tasaMensual, mesPrimerCobro } from '../lib/deudas'
 import { leerArchivo, crearExcel, descargar } from '../lib/excel'
 import { interpretar, plantilla } from '../lib/importar'
 
@@ -76,6 +76,11 @@ export function FormGasto({ datos, mes, inicial, onGuardar, onEliminar }) {
             {v.monto > 0 && Number(v.cuotas) > 1 && `Cuota aprox. ${new Intl.NumberFormat('es-CO').format(Math.round(v.monto / v.cuotas))} + intereses.`}
             {Number(v.cuotas) === 1 && ' A 1 cuota normalmente no cobra intereses.'}
           </small>
+          {(() => {
+            const t = tarjetas.find((x) => x.id === v.deudaId)
+            const pm = t && mesPrimerCobro(t, { fecha: v.fecha })
+            return pm ? <small className="nota-corte">Corte el día {t.diaCorte}: la primera cuota se cobra en <b>{nombreMes(pm)}</b>.</small> : null
+          })()}
         </div>
       )}
       <div className="campo">
@@ -135,7 +140,7 @@ export function FormIngreso({ mes, inicial, onGuardar, onEliminar }) {
 // ---------- Asistente para crear tarjeta o crédito ----------
 export function AsistenteDeuda({ fmt, onCrear, onImportar }) {
   const [paso, setPaso] = useState(0)
-  const [d, setD] = useState({ tipo: 'tarjeta', nombre: '', color: 'oro', ultimos4: '', tasa: '', tipoTasa: 'EA', cupo: '', diaPago: '' })
+  const [d, setD] = useState({ tipo: 'tarjeta', nombre: '', color: 'oro', ultimos4: '', tasa: '', tipoTasa: 'EA', cupo: '', diaPago: '', diaCorte: '' })
   const [s, setS] = useState({ monto: '', cuotas: 12, cuotaFija: '' })
   const [error, setError] = useState('')
   const set = (k, v) => setD((x) => ({ ...x, [k]: v }))
@@ -159,7 +164,7 @@ export function AsistenteDeuda({ fmt, onCrear, onImportar }) {
   }
   const guardar = () => {
     onCrear(
-      { ...d, nombre: d.nombre.trim(), tasa: Number(d.tasa) || 0, cupo: Number(d.cupo) || 0, diaPago: Number(d.diaPago) || undefined, ultimos4: d.ultimos4 || undefined },
+      { ...d, nombre: d.nombre.trim(), tasa: Number(d.tasa) || 0, cupo: Number(d.cupo) || 0, diaPago: Number(d.diaPago) || undefined, diaCorte: esCredito ? undefined : Number(d.diaCorte) || undefined, ultimos4: d.ultimos4 || undefined },
       { monto: Number(s.monto) || 0, cuotas: Number(s.cuotas) || 1, cuotaFija: Number(s.cuotaFija) || cuotaSugerida }
     )
   }
@@ -219,16 +224,23 @@ export function AsistenteDeuda({ fmt, onCrear, onImportar }) {
         {paso === 2 && (
           <>
             <p className="paso-titulo">Condiciones</p>
+            <div className="campo">
+              <label className="campo-etiqueta" htmlFor="d-tasa">Tasa de interés %</label>
+              <input id="d-tasa" autoFocus inputMode="decimal" value={d.tasa} placeholder={d.tipoTasa === 'EA' ? '28,5' : '2,1'} onChange={(e) => set('tasa', e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''))} />
+            </div>
             <div className="fila-2">
+              {!esCredito && (
+                <div className="campo">
+                  <label className="campo-etiqueta" htmlFor="d-corte">Día de corte</label>
+                  <input id="d-corte" inputMode="numeric" value={d.diaCorte} placeholder="Ej: 30" onChange={(e) => set('diaCorte', e.target.value.replace(/\D/g, '').slice(0, 2))} />
+                </div>
+              )}
               <div className="campo">
-                <label className="campo-etiqueta" htmlFor="d-tasa">Tasa de interés %</label>
-                <input id="d-tasa" autoFocus inputMode="decimal" value={d.tasa} placeholder={d.tipoTasa === 'EA' ? '28,5' : '2,1'} onChange={(e) => set('tasa', e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''))} />
-              </div>
-              <div className="campo">
-                <label className="campo-etiqueta" htmlFor="d-dia">Día de pago</label>
-                <input id="d-dia" inputMode="numeric" value={d.diaPago} placeholder="15" onChange={(e) => set('diaPago', e.target.value.replace(/\D/g, '').slice(0, 2))} />
+                <label className="campo-etiqueta" htmlFor="d-dia">Día límite de pago</label>
+                <input id="d-dia" inputMode="numeric" value={d.diaPago} placeholder="Ej: 15" onChange={(e) => set('diaPago', e.target.value.replace(/\D/g, '').slice(0, 2))} />
               </div>
             </div>
+            {!esCredito && <small className="nota">El corte es el día en que el banco cierra tu extracto: lo que compres después pasa al siguiente.</small>}
             <Segmentado etiqueta="Tipo de tasa" valor={d.tipoTasa} onChange={(v) => set('tipoTasa', v)} opciones={[{ valor: 'EA', texto: 'Efectiva anual (E.A.)' }, { valor: 'MV', texto: 'Mensual (M.V.)' }]} />
             <small className="nota">La encuentras en tu extracto o en la app del banco.</small>
             {!esCredito && (
@@ -284,7 +296,7 @@ export function FormEditarDeuda({ deuda, onGuardar, onEliminar }) {
   const esCredito = deuda.tipo === 'credito'
   return (
     <Formulario
-      inicial={{ ...deuda, ultimos4: deuda.ultimos4 ?? '', diaPago: deuda.diaPago ?? '' }}
+      inicial={{ ...deuda, ultimos4: deuda.ultimos4 ?? '', diaPago: deuda.diaPago ?? '', diaCorte: deuda.diaCorte ?? '' }}
       campos={[
         { nombre: 'nombre', etiqueta: 'Nombre', tipo: 'texto', requerido: true },
         { nombre: 'color', etiqueta: 'Color', tipo: 'color' },
@@ -292,7 +304,8 @@ export function FormEditarDeuda({ deuda, onGuardar, onEliminar }) {
         { nombre: 'tasa', etiqueta: 'Tasa de interés %', tipo: 'numero', requerido: true },
         { nombre: 'tipoTasa', etiqueta: 'Tipo de tasa', tipo: 'segmento', opciones: [{ valor: 'EA', texto: 'E.A.' }, { valor: 'MV', texto: 'M.V.' }] },
         { nombre: 'cupo', etiqueta: 'Cupo total', tipo: 'monto', oculto: () => esCredito },
-        { nombre: 'diaPago', etiqueta: 'Día de pago', tipo: 'numero', min: 1, max: 31, paso: 1, vacio: undefined },
+        { nombre: 'diaCorte', etiqueta: 'Día de corte', tipo: 'numero', min: 1, max: 31, paso: 1, vacio: undefined, oculto: () => esCredito, ayuda: 'Las compras después de este día se cobran en el siguiente extracto.' },
+        { nombre: 'diaPago', etiqueta: 'Día límite de pago', tipo: 'numero', min: 1, max: 31, paso: 1, vacio: undefined },
       ]}
       onGuardar={(x) => onGuardar({ ...x, ultimos4: String(x.ultimos4 || '').replace(/\D/g, '').slice(0, 4) || undefined })}
       onEliminar={onEliminar}
