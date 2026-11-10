@@ -1,6 +1,6 @@
 import {
   LuTriangleAlert, LuCalendarDays, LuChartPie, LuChartColumn, LuScale, LuCreditCard, LuRepeat, LuCheck,
-  LuSparkles, LuArrowRight, LuWallet,
+  LuSparkles, LuArrowRight, LuWallet, LuBellRing,
 } from 'react-icons/lu'
 import { mesActual, soloMes, nombreMes, pct, formatFecha, hoyISO, color } from '../lib/format'
 import { historico, resumenMes, vencimientos } from '../lib/resumen'
@@ -72,7 +72,9 @@ export default function Inicio({ datos, acciones, mes, fmt, ir, abrir }) {
 
       <section className="hero">
         <span className="hero-glow" aria-hidden="true" />
-        <span className="hero-etiqueta">Te queda libre en {soloMes(mes).toLowerCase()}</span>
+        <span className="hero-etiqueta">
+          {r.futuro ? 'Proyección: te quedaría libre en ' : 'Te queda libre en '}{soloMes(mes).toLowerCase()}
+        </span>
         <div className={`hero-monto ${r.libre < 0 ? 'negativo' : ''}`}>
           <NumeroAnimado valor={r.libre} formato={fmt.dinero} />
         </div>
@@ -92,7 +94,9 @@ export default function Inicio({ datos, acciones, mes, fmt, ir, abrir }) {
         </div>
       )}
 
-      <Tarjeta titulo="Por pagar este mes" Icono={LuWallet}>
+      <Tarjeta titulo={r.futuro ? `Por pagar en ${soloMes(mes).toLowerCase()}` : 'Por pagar este mes'} Icono={LuWallet}
+        accion={venc.length > 0 && <button className="btn-icono" aria-label="Recordatorios en el calendario" onClick={() => abrir('recordatorios')}><LuBellRing /></button>}>
+        {r.futuro && <p className="nota"><LuSparkles aria-hidden="true" /> Proyección suponiendo que pagas al día las cuotas de los meses anteriores.</p>}
         <div className="pagar-mes">
           <div><span>Total</span><strong>{fmt.dinero(r.compromisos)}</strong></div>
           <div><span>Pagado</span><strong className="texto-verde">{fmt.dinero(r.pagadoMes)}</strong></div>

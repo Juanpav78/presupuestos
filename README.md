@@ -15,7 +15,7 @@ App web pensada para el celular para controlar tus gastos y tus tarjetas de cré
 
 ## Excel
 
-Botón **＋ → Subir Excel** (o en Tarjetas / Ajustes). Descarga la plantilla, llénala y súbela. También reconoce archivos propios con columnas como *Nombre/Tarjeta, Fecha, Monto/Valor, Cuotas, Cuotas pagadas, Saldo, Interés, Pago, Cupo, Día de pago*. Antes de guardar muestra una vista previa.
+Botón **＋ → Subir Excel** (o en Tarjetas / Ajustes). Descarga la plantilla: la hoja **Tarjetas** tiene una fila por tarjeta (interés, cupo, día de pago) y la hoja **Compras** una fila por compra, unida a su tarjeta por el nombre. Lo que debes en cada tarjeta es la suma de sus compras. También reconoce archivos propios con columnas como *Nombre/Tarjeta, Fecha, Monto/Valor, Cuotas, Cuotas pagadas, Saldo, Interés, Pago, Cupo, Día de pago*. Antes de guardar muestra una vista previa.
 
 ## Despliegue (Netlify)
 

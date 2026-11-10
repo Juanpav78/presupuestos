@@ -119,7 +119,9 @@ export function interpretar(hojas) {
   const fijos = []
   const avisos = []
 
-  for (const [nombreHoja, filas] of Object.entries(hojas)) {
+  const orden = (n) => (/compra|gasto|fijo/.test(norm(n)) ? 1 : 0)
+  const entradas = Object.entries(hojas).sort((a, b) => orden(a[0]) - orden(b[0]))
+  for (const [nombreHoja, filas] of entradas) {
     // La fila de encabezados es la primera fila con al menos 2 celdas de texto
     const iEnc = filas.findIndex((f) => f && f.filter((c) => typeof c === 'string' && c.trim()).length >= 2)
     if (iEnc < 0) continue
@@ -155,12 +157,18 @@ export function interpretar(hojas) {
           if (numero(v('diaPago')) && !d.diaPago) d.diaPago = numero(v('diaPago'))
         }
         const d = deudas[clave].datos
+        const esCreditoD = d.tipo === 'credito'
         let monto = numero(v('monto'))
         let saldo = numero(v('saldo'))
         const pago = numero(v('pago'))
         const pagadas = Math.max(Math.round(numero(v('cuotasPagadas')) ?? 0), 0)
         let cuotas = Math.round(numero(v('cuotas')) ?? 0)
-        if (!monto && !saldo) { avisos.push(`Fila ${iEnc + i + 2} de "${nombreHoja}": sin monto ni saldo, se omitió.`); return }
+        if (!monto && !saldo) {
+          // Fila que solo define la tarjeta (tasa, cupo, día…): no es un error
+          const defineTarjeta = ['tasa', 'cupo', 'diaPago', 'tipo', 'color'].some((k) => col[k] !== undefined && texto(v(k)) !== '')
+          if (!defineTarjeta) avisos.push(`Fila ${iEnc + i + 2} de "${nombreHoja}": sin valor ni saldo, se omitió.`)
+          return
+        }
         if (!monto) monto = saldo
         if (saldo === undefined) saldo = cuotas > 0 && pagadas > 0 ? Math.max(monto * (1 - pagadas / cuotas), 0) : monto
         if (!cuotas) {
@@ -169,16 +177,16 @@ export function interpretar(hojas) {
           if (pago > 0) {
             const n = r > 0 && pago > saldo * r ? Math.ceil(-Math.log(1 - (r * saldo) / pago) / Math.log(1 + r)) : Math.ceil(saldo / pago)
             cuotas = pagadas + Math.max(n || 1, 1)
-          } else cuotas = esCredito ? 12 : 1
+          } else cuotas = esCreditoD ? 12 : 1
         }
         deudas[clave].compras.push({
-          nombre: texto(v('descripcion')) || (esCredito ? 'Saldo del crédito' : 'Compra'),
+          nombre: texto(v('descripcion')) || (esCreditoD ? 'Saldo del crédito' : 'Compra'),
           fecha: fecha(v('fecha')) ?? hoyISO(),
           monto,
-          saldo,
+          saldo: Math.round(saldo * 100) / 100,
           cuotas: Math.max(cuotas, pagadas + 1),
           cuotasPagadas: Math.min(pagadas, Math.max(cuotas - 1, 0)),
-          ...(esCredito && pago > 0 ? { cuotaFija: pago } : {}),
+          ...(esCreditoD && pago > 0 ? { cuotaFija: pago } : {}),
         })
       })
     }
@@ -213,7 +221,10 @@ export function interpretar(hojas) {
 }
 
 // ---------- Plantilla y exportación ----------
-const ENC_DEUDAS = ['Tarjeta o crédito', 'Tipo', 'Descripción', 'Fecha', 'Monto', 'Cuotas', 'Cuotas pagadas', 'Saldo pendiente', 'Interés %', 'Tipo tasa', 'Pago mensual', 'Cupo', 'Día de pago', 'Color']
+// Hoja "Tarjetas": una fila por tarjeta o crédito (sus condiciones).
+// Hoja "Compras": una fila por compra o deuda; se une a su tarjeta por el nombre.
+const ENC_TARJETAS = ['Tarjeta o crédito', 'Tipo', 'Interés %', 'Tipo tasa', 'Cupo', 'Día de pago', 'Color']
+const ENC_COMPRAS = ['Tarjeta o crédito', 'Descripción', 'Fecha', 'Valor', 'Cuotas', 'Cuotas pagadas', 'Saldo pendiente', 'Pago mensual']
 const ENC_GASTOS = ['Fecha', 'Descripción', 'Categoría', 'Monto']
 const ENC_FIJOS = ['Nombre', 'Monto', 'Categoría', 'Día de pago']
 
@@ -221,13 +232,23 @@ export function plantilla() {
   const hoy = hoyISO()
   return [
     {
-      nombre: 'Tarjetas y créditos',
+      nombre: 'Tarjetas',
       filas: [
-        ENC_DEUDAS,
-        ['Visa Oro', 'Tarjeta', 'Celular', hoy, 2400000, 12, 3, '', 28.5, 'EA', '', 6000000, 15, 'Oro'],
-        ['Visa Oro', 'Tarjeta', 'Mercado', hoy, 350000, 1, 0, '', '', '', '', '', '', ''],
-        ['Mastercard', 'Tarjeta', 'Saldo anterior', hoy, '', '', '', 1800000, 2.1, 'MV', 150000, 4000000, 5, 'Negro'],
-        ['Préstamo libre inversión', 'Crédito', '', hoy, 15000000, 48, 10, 11200000, 18, 'EA', 440000, '', 28, 'Azul'],
+        ENC_TARJETAS,
+        ['Visa Oro', 'Tarjeta', 28.5, 'EA', 6000000, 15, 'Oro'],
+        ['Mastercard', 'Tarjeta', 2.1, 'MV', 4000000, 5, 'Negro'],
+        ['Préstamo libre inversión', 'Crédito', 18, 'EA', '', 28, 'Azul'],
+      ],
+    },
+    {
+      nombre: 'Compras',
+      filas: [
+        ENC_COMPRAS,
+        ['Visa Oro', 'Celular', '2026-05-10', 2400000, 12, 6, '', ''],
+        ['Visa Oro', 'Tiquetes', '2026-09-02', 1200000, 6, 2, '', ''],
+        ['Visa Oro', 'Mercado', hoy, 350000, 1, 0, '', ''],
+        ['Mastercard', 'Saldo anterior', hoy, '', '', '', 1800000, 150000],
+        ['Préstamo libre inversión', 'Saldo del crédito', '2025-06-01', 15000000, 48, 17, 10800000, 440000],
       ],
     },
     { nombre: 'Gastos', filas: [ENC_GASTOS, [hoy, 'Almuerzo', 'Comida', 22000], [hoy, 'Gasolina', 'Transporte', 80000]] },
@@ -236,11 +257,13 @@ export function plantilla() {
       nombre: 'Instrucciones',
       filas: [
         ['Cómo llenar este archivo'],
-        ['Tarjetas y créditos: una fila por compra o deuda. Repite el nombre de la tarjeta para agregar varias compras a la misma.'],
-        ['Si no tienes el detalle de compras, pon una sola fila con el "Saldo pendiente" y el "Pago mensual".'],
-        ['Interés %: el que dice tu extracto. Tipo tasa: EA (efectiva anual) o MV (mensual vencida).'],
+        ['1. Hoja "Tarjetas": una fila por cada tarjeta o crédito, con su interés, cupo y día de pago. No lleva montos.'],
+        ['2. Hoja "Compras": una fila por cada compra. Escribe el nombre de la tarjeta igual que en la hoja Tarjetas para que se una a ella.'],
+        ['   Ejemplo: la Visa Oro tiene 3 compras (Celular, Tiquetes y Mercado); lo que debes en la tarjeta es la suma de las tres.'],
+        ['3. Si no tienes el detalle de compras, pon una sola fila con el "Saldo pendiente" y el "Pago mensual" (como la Mastercard).'],
+        ['4. Créditos: pon el saldo, las cuotas y el pago mensual (cuota fija).'],
+        ['Interés %: el de tu extracto. Tipo tasa: EA (efectiva anual) o MV (mensual vencida).'],
         ['Cuotas pagadas y Saldo pendiente son opcionales: si no los pones, se calculan.'],
-        ['Créditos (préstamos, vehículo): pon Tipo = Crédito y el Pago mensual (cuota fija).'],
         ['Color: Oro, Negro, Azul, Morado, Verde, Rojo, Rosa, Naranja, Turquesa o Plata.'],
         ['Fechas en formato día/mes/año o año-mes-día. Puedes borrar las hojas que no uses.'],
       ],
@@ -249,26 +272,23 @@ export function plantilla() {
 }
 
 export function exportar(datos) {
-  const filasDeudas = [ENC_DEUDAS]
-  datos.deudas.forEach((d) => {
-    const base = [d.nombre, d.tipo === 'credito' ? 'Crédito' : 'Tarjeta']
-    const extra = [d.tasa, d.tipoTasa, '', d.cupo || '', d.diaPago || '', COLORES[d.color]?.nombre ?? '']
-    if (!d.compras.length) filasDeudas.push([...base, '', '', '', '', '', 0, ...extra])
-    d.compras.forEach((c) => {
-      const fila = [...base, c.nombre, c.fecha, c.monto, c.cuotas, c.cuotasPagadas || 0, Math.round(c.saldo), ...extra]
-      fila[10] = c.cuotaFija || ''
-      filasDeudas.push(fila)
-    })
-  })
+  const nombre = (id) => datos.deudas.find((d) => d.id === id)?.nombre ?? ''
   return [
-    { nombre: 'Tarjetas y créditos', filas: filasDeudas },
+    {
+      nombre: 'Tarjetas',
+      filas: [ENC_TARJETAS, ...datos.deudas.map((d) => [d.nombre, d.tipo === 'credito' ? 'Crédito' : 'Tarjeta', d.tasa, d.tipoTasa, d.cupo || '', d.diaPago || '', COLORES[d.color]?.nombre ?? ''])],
+    },
+    {
+      nombre: 'Compras',
+      filas: [ENC_COMPRAS, ...datos.deudas.flatMap((d) => d.compras.map((c) => [d.nombre, c.nombre, c.fecha, c.monto, c.cuotas, c.cuotasPagadas || 0, Math.round(c.saldo), c.cuotaFija || '']))],
+    },
     { nombre: 'Gastos', filas: [ENC_GASTOS, ...[...datos.gastos].sort((a, b) => a.fecha.localeCompare(b.fecha)).map((g) => [g.fecha, g.nombre, g.categoria, g.monto])] },
     { nombre: 'Fijos', filas: [ENC_FIJOS, ...datos.fijos.map((f) => [f.nombre, Number(f.monto), f.categoria, Number(f.dia)])] },
     {
       nombre: 'Pagos',
       filas: [
         ['Fecha', 'Tarjeta o crédito', 'Monto', 'A intereses', 'A cuotas', 'Abono a capital'],
-        ...datos.pagos.map((p) => [p.fecha, datos.deudas.find((d) => d.id === p.deudaId)?.nombre ?? '', p.monto, p.reparto?.intereses ?? 0, p.reparto?.cuotas ?? 0, p.reparto?.abono ?? 0]),
+        ...datos.pagos.map((p) => [p.fecha, nombre(p.deudaId), p.monto, p.reparto?.intereses ?? 0, p.reparto?.cuotas ?? 0, p.reparto?.abono ?? 0]),
       ],
     },
   ]

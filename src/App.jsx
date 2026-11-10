@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   LuLayoutDashboard, LuReceipt, LuCreditCard, LuTarget, LuSettings, LuPlus, LuChevronLeft, LuChevronRight,
-  LuRepeat, LuWallet, LuShoppingBag, LuFileSpreadsheet, LuBanknote, LuLandmark,
+  LuRepeat, LuWallet, LuShoppingBag, LuFileSpreadsheet, LuBanknote, LuLandmark, LuCalculator, LuBellRing,
 } from 'react-icons/lu'
 import { useFinanzas } from './lib/store'
 import { crearFormato, mesActual, nombreMes, sumarMeses } from './lib/format'
@@ -16,6 +16,7 @@ import TarjetaVisual from './components/TarjetaVisual'
 import {
   FormGasto, FormFijo, FormIngreso, AsistenteDeuda, FormEditarDeuda, FormCompra, FormPago, Importar,
 } from './components/Formularios'
+import { MeAlcanza, Recordatorios } from './components/Herramientas'
 
 const PESTANAS = [
   { id: 'inicio', texto: 'Inicio', Icono: LuLayoutDashboard },
@@ -101,6 +102,8 @@ export default function App() {
               { t: 'Compra a cuotas', d: 'Con tarjeta de crédito', I: LuShoppingBag, f: () => (tarjetas.length === 1 ? abrir('compra', { deudaId: tarjetas[0].id }) : abrir('elegir', { siguiente: 'compra' })), oculto: !tarjetas.length },
               { t: 'Tarjeta o crédito', d: 'Agregar una nueva', I: LuLandmark, f: () => abrir('deuda-nueva') },
               { t: 'Ingreso extra', d: 'Prima, bono, freelance', I: LuBanknote, f: () => abrir('ingreso') },
+              { t: '¿Me alcanza?', d: 'Antes de comprar', I: LuCalculator, f: () => abrir('alcanza') },
+              { t: 'Recordatorios', d: 'Pagos en tu calendario', I: LuBellRing, f: () => abrir('recordatorios') },
               { t: 'Subir Excel', d: 'Varias cosas a la vez', I: LuFileSpreadsheet, f: () => abrir('importar') },
             ]
               .filter((a) => !a.oculto)
@@ -130,7 +133,7 @@ export default function App() {
           <FormGasto
             datos={datos}
             mes={mes}
-            inicial={modal.gasto}
+            inicial={modal.gasto ?? modal.prefill}
             onGuardar={(g) => { acciones.guardarGasto(g); cerrar(); avisar(modal.gasto ? 'Gasto actualizado' : 'Gasto agregado') }}
             onEliminar={modal.gasto && (() => { acciones.eliminarGasto(modal.gasto.id); cerrar() })}
           />
@@ -199,10 +202,26 @@ export default function App() {
         const d = datos.deudas.find((x) => x.id === modal.deudaId)
         return d && (
           <Hoja titulo={`Pagar ${d.nombre}`} subtitulo="Primero intereses y cuotas del mes; el excedente abona a la compra más antigua" onCerrar={cerrar}>
-            <FormPago deuda={d} fmt={fmt} onPagar={(m, f) => { acciones.pagarDeuda(d.id, m, f); cerrar(); avisar(`Pago de ${fmt.dinero(m)} aplicado`) }} />
+            <FormPago deuda={d} fmt={fmt} onPagar={(m, f) => {
+              const id = acciones.pagarDeuda(d.id, m, f)
+              cerrar()
+              avisar(`Pago de ${fmt.dinero(m)} aplicado`, { texto: 'Deshacer', onClick: () => { acciones.deshacerPago(id); avisar('Pago revertido') } })
+            }} />
           </Hoja>
         )
       })()}
+
+      {modal?.tipo === 'alcanza' && (
+        <Hoja titulo="¿Me alcanza?" subtitulo="Antes de comprar, mira cuánto te cuesta de verdad" onCerrar={cerrar}>
+          <MeAlcanza datos={datos} fmt={fmt} onRegistrar={(p) => abrir('gasto', { prefill: { nombre: '', categoria: 'Compras', fecha: new Date().toISOString().slice(0, 10), ...p } })} />
+        </Hoja>
+      )}
+
+      {modal?.tipo === 'recordatorios' && (
+        <Hoja titulo="Recordatorios de pago" onCerrar={cerrar}>
+          <Recordatorios datos={datos} fmt={fmt} />
+        </Hoja>
+      )}
 
       {modal?.tipo === 'importar' && (
         <Hoja titulo="Subir desde Excel" subtitulo="Tarjetas, compras a cuotas, gastos y fijos" onCerrar={cerrar}>
