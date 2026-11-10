@@ -1,108 +1,85 @@
 import { useState } from 'react'
-import { CATEGORIAS, formatFecha, hoyISO, infoCategoria, mesActual } from '../lib/format'
+import { LuReceipt, LuRepeat, LuBanknote, LuCheck, LuPlus, LuCreditCard } from 'react-icons/lu'
+import { formatFecha, pct } from '../lib/format'
 import { resumenMes } from '../lib/resumen'
-import { Formulario, Hoja, Tarjeta, Vacio, Dato } from '../components/UI'
+import { IconoCategoria } from '../lib/categorias'
+import { Tarjeta, Vacio, Dato, Segmentado, NumeroAnimado } from '../components/UI'
 import { Progreso } from '../components/Graficas'
 
-const opcionesCategoria = Object.entries(CATEGORIAS).map(([k, v]) => ({ valor: k, texto: `${v.emoji} ${k}` }))
-
-export function FormGasto({ datos, mes, inicial, onGuardar, onEliminar }) {
-  const tarjetas = datos.deudas.filter((d) => d.tipo === 'tarjeta')
+export default function Gastos({ datos, acciones, mes, fmt, abrir }) {
+  const [seccion, setSeccion] = useState('normales')
   return (
-    <Formulario
-      inicial={inicial ?? { nombre: '', monto: '', categoria: 'Comida', fecha: mes === mesActual() ? hoyISO() : `${mes}-01`, deudaId: '' }}
-      campos={[
-        { nombre: 'nombre', etiqueta: 'Descripción', tipo: 'texto', requerido: true, placeholder: 'Ej: Mercado, almuerzo, gasolina' },
-        { nombre: 'monto', etiqueta: 'Monto', tipo: 'numero', requerido: true, min: 0 },
-        { nombre: 'categoria', etiqueta: 'Categoría', tipo: 'select', opciones: opcionesCategoria },
-        { nombre: 'fecha', etiqueta: 'Fecha', tipo: 'fecha', requerido: true },
-        {
-          nombre: 'deudaId',
-          etiqueta: 'Medio de pago',
-          tipo: 'select',
-          opciones: [{ valor: '', texto: '💵 Efectivo / débito' }, ...tarjetas.map((t) => ({ valor: t.id, texto: `💳 ${t.nombre}` }))],
-          ayuda: (v) => (v.deudaId ? 'Se sumará al saldo de esa tarjeta.' : tarjetas.length ? '' : 'Agrega tus tarjetas en "Deudas" para registrar compras a crédito.'),
-        },
-      ]}
-      onGuardar={(g) => onGuardar({ ...g, deudaId: g.deudaId || undefined })}
-      onEliminar={onEliminar}
-      textoBoton={inicial ? 'Guardar cambios' : 'Añadir gasto'}
-    />
+    <>
+      <Segmentado
+        etiqueta="Tipo de gastos"
+        valor={seccion}
+        onChange={setSeccion}
+        opciones={[
+          { valor: 'normales', texto: 'Del día a día', Icono: LuReceipt },
+          { valor: 'fijos', texto: 'Fijos mensuales', Icono: LuRepeat },
+        ]}
+      />
+      <div className="vista" key={seccion}>
+        {seccion === 'normales' ? <Normales {...{ datos, mes, fmt, abrir }} /> : <Fijos {...{ datos, acciones, mes, fmt, abrir }} />}
+      </div>
+    </>
   )
 }
 
-export default function Gastos({ datos, acciones, mes, fmt }) {
+function Normales({ datos, mes, fmt, abrir }) {
   const r = resumenMes(datos, mes)
   const [filtro, setFiltro] = useState('')
-  const [editar, setEditar] = useState(null)
-  const [ingreso, setIngreso] = useState(null)
-
-  const lista = r.gastosMes
-    .filter((g) => !filtro || g.categoria === filtro)
-    .sort((a, b) => b.fecha.localeCompare(a.fecha))
-
-  const porDia = lista.reduce((acc, g) => {
-    ;(acc[g.fecha] = acc[g.fecha] || []).push(g)
-    return acc
-  }, {})
-
-  const categoriasUsadas = [...new Set(r.gastosMes.map((g) => g.categoria))]
+  const lista = r.gastosMes.filter((g) => !filtro || g.categoria === filtro).sort((a, b) => b.fecha.localeCompare(a.fecha))
+  const porDia = lista.reduce((acc, g) => ((acc[g.fecha] = acc[g.fecha] || []).push(g), acc), {})
+  const categorias = [...new Set(r.gastosMes.map((g) => g.categoria))]
   const extras = datos.ingresosExtra.filter((i) => i.fecha?.startsWith(mes))
-  const nombreTarjeta = (id) => datos.deudas.find((d) => d.id === id)?.nombre
+  const tarjeta = (id) => datos.deudas.find((d) => d.id === id)
 
   return (
     <>
-      <Tarjeta titulo="Gastos del mes">
-        <div className="datos-grid">
-          <Dato etiqueta="Gastado" valor={fmt.dinero(r.gastado)} />
-          <Dato etiqueta="Con tarjeta" valor={fmt.dinero(r.gastadoTarjeta)} />
+      <Tarjeta className="resumen-gastos">
+        <div className="rg-principal">
+          <span>Gastado este mes</span>
+          <strong><NumeroAnimado valor={r.gastado} formato={fmt.dinero} /></strong>
         </div>
         {r.presupuestoVariable > 0 ? (
           <>
-            <Progreso valor={r.gastado} max={r.presupuestoVariable} />
-            <p className={`nota ${r.gastado > r.presupuestoVariable ? 'texto-rojo' : ''}`}>
-              {r.gastado > r.presupuestoVariable
-                ? `Te pasaste ${fmt.dinero(r.gastado - r.presupuestoVariable)} del presupuesto de ${fmt.dinero(r.presupuestoVariable)}`
-                : `Te quedan ${fmt.dinero(r.presupuestoVariable - r.gastado)} de ${fmt.dinero(r.presupuestoVariable)} para gastos variables`}
-            </p>
+            <Progreso valor={r.gastado} max={r.presupuestoVariable} etiqueta="Presupuesto usado" />
+            <div className="datos-grid">
+              <Dato etiqueta="Presupuesto" valor={fmt.dinero(r.presupuestoVariable)} />
+              <Dato etiqueta={r.gastado > r.presupuestoVariable ? 'Te pasaste' : 'Te queda'} valor={fmt.dinero(Math.abs(r.presupuestoVariable - r.gastado))} tono={r.gastado > r.presupuestoVariable ? 'rojo' : 'verde'} />
+            </div>
           </>
         ) : (
-          <p className="nota">Define un presupuesto de gastos variables en ⚙️ Ajustes para controlar el límite.</p>
+          <p className="nota">Pon un presupuesto mensual en Ajustes para ver cuánto te queda.</p>
         )}
+        {r.gastadoTarjeta > 0 && <p className="nota"><LuCreditCard aria-hidden="true" /> {fmt.dinero(r.gastadoTarjeta)} fueron con tarjeta de crédito ({pct(r.gastadoTarjeta / r.gastado)}).</p>}
       </Tarjeta>
 
-      {categoriasUsadas.length > 1 && (
-        <div className="chips">
+      {categorias.length > 1 && (
+        <div className="chips desplazable">
           <button className={!filtro ? 'activo' : ''} onClick={() => setFiltro('')}>Todos</button>
-          {categoriasUsadas.map((c) => (
-            <button key={c} className={filtro === c ? 'activo' : ''} onClick={() => setFiltro(c)}>
-              {infoCategoria(c).emoji} {c}
-            </button>
+          {categorias.map((c) => (
+            <button key={c} className={filtro === c ? 'activo' : ''} onClick={() => setFiltro(c)}>{c}</button>
           ))}
         </div>
       )}
 
       {lista.length === 0 ? (
-        <Vacio emoji="🧾" texto="No hay gastos registrados este mes. Usa el botón ＋ para agregar uno." />
+        <Vacio Icono={LuReceipt} titulo="Sin gastos este mes" texto="Registra cada gasto en segundos: monto, categoría y listo.">
+          <button className="btn btn-primario" onClick={() => abrir('gasto')}><LuPlus aria-hidden="true" /> Agregar gasto</button>
+        </Vacio>
       ) : (
-        Object.entries(porDia).map(([fecha, gastos]) => (
-          <div key={fecha} className="grupo-dia">
-            <h4>
-              {formatFecha(fecha)}
-              <span>{fmt.dinero(gastos.reduce((t, g) => t + g.monto, 0))}</span>
-            </h4>
-            <ul className="lista">
+        Object.entries(porDia).map(([fecha, gastos], i) => (
+          <div key={fecha} className="grupo-dia" style={{ animationDelay: `${i * 40}ms` }}>
+            <h4>{formatFecha(fecha)}<span>{fmt.dinero(gastos.reduce((t, g) => t + g.monto, 0))}</span></h4>
+            <ul className="lista tarjeta-lista">
               {gastos.map((g) => (
-                <li key={g.id} onClick={() => setEditar(g)}>
-                  <span className="icono-cat" style={{ background: infoCategoria(g.categoria).color + '22' }}>
-                    {infoCategoria(g.categoria).emoji}
-                  </span>
+                <li key={g.id} onClick={() => abrir('gasto', { gasto: g })}>
+                  <IconoCategoria categoria={g.categoria} />
                   <div className="lista-texto">
                     <strong>{g.nombre}</strong>
-                    <small>
-                      {g.categoria}
-                      {g.deudaId && ` · 💳 ${nombreTarjeta(g.deudaId) ?? 'Tarjeta'}`}
-                    </small>
+                    <small>{g.categoria}{g.deudaId && <> · <LuCreditCard aria-hidden="true" /> {tarjeta(g.deudaId)?.nombre ?? 'Tarjeta'}</>}</small>
                   </div>
                   <span className="monto">{fmt.dinero(g.monto)}</span>
                 </li>
@@ -112,67 +89,66 @@ export default function Gastos({ datos, acciones, mes, fmt }) {
         ))
       )}
 
-      <Tarjeta
-        titulo="Ingresos extra"
-        accion={<button className="btn-texto" onClick={() => setIngreso({})}>+ Agregar</button>}
-      >
-        <p className="nota">Salario base: {fmt.dinero(datos.config.ingresoMensual)} (cámbialo en ⚙️). Aquí suma primas, bonos o trabajos extra.</p>
+      <Tarjeta titulo="Ingresos extra" Icono={LuBanknote} accion={<button className="btn-texto" onClick={() => abrir('ingreso')}><LuPlus aria-hidden="true" /> Agregar</button>}>
+        <p className="nota">Salario: {fmt.dinero(datos.config.ingresoMensual)}. Suma aquí primas, bonos o trabajos extra del mes.</p>
         {extras.length > 0 && (
-          <ul className="lista">
+          <ul className="lista compacta">
             {extras.map((i) => (
-              <li key={i.id} onClick={() => setIngreso(i)}>
-                <span className="icono-cat">💰</span>
-                <div className="lista-texto">
-                  <strong>{i.nombre}</strong>
-                  <small>{formatFecha(i.fecha)}</small>
-                </div>
+              <li key={i.id} onClick={() => abrir('ingreso', { ingreso: i })}>
+                <span className="icono-cat" style={{ '--c': '#22C55E' }}><LuBanknote /></span>
+                <div className="lista-texto"><strong>{i.nombre}</strong><small>{formatFecha(i.fecha)}</small></div>
                 <span className="monto texto-verde">+{fmt.dinero(i.monto)}</span>
               </li>
             ))}
           </ul>
         )}
       </Tarjeta>
+    </>
+  )
+}
 
-      {editar && (
-        <Hoja titulo="Editar gasto" onCerrar={() => setEditar(null)}>
-          <FormGasto
-            datos={datos}
-            mes={mes}
-            inicial={{ ...editar, deudaId: editar.deudaId ?? '' }}
-            onGuardar={(g) => {
-              acciones.guardarGasto(g)
-              setEditar(null)
-            }}
-            onEliminar={() => {
-              acciones.eliminarGasto(editar.id)
-              setEditar(null)
-            }}
-          />
-        </Hoja>
-      )}
+function Fijos({ datos, acciones, mes, fmt, abrir }) {
+  const r = resumenMes(datos, mes)
+  const lista = [...datos.fijos].sort((a, b) => a.dia - b.dia)
+  return (
+    <>
+      <Tarjeta className="resumen-gastos">
+        <div className="rg-principal">
+          <span>Fijos del mes</span>
+          <strong><NumeroAnimado valor={r.fijosTotal} formato={fmt.dinero} /></strong>
+        </div>
+        <Progreso valor={r.fijosPagados} max={r.fijosTotal || 1} color="var(--verde)" etiqueta="Fijos pagados" />
+        <div className="datos-grid">
+          <Dato etiqueta="Pagado" valor={fmt.dinero(r.fijosPagados)} tono="verde" />
+          <Dato etiqueta="Pendiente" valor={fmt.dinero(r.fijosTotal - r.fijosPagados)} />
+          {r.ingreso > 0 && <Dato etiqueta="% de tu ingreso" valor={pct(r.fijosTotal / r.ingreso)} />}
+        </div>
+      </Tarjeta>
 
-      {ingreso && (
-        <Hoja titulo={ingreso.id ? 'Editar ingreso' : 'Nuevo ingreso extra'} onCerrar={() => setIngreso(null)}>
-          <Formulario
-            inicial={ingreso.id ? ingreso : { nombre: '', monto: '', fecha: mes === mesActual() ? hoyISO() : `${mes}-01` }}
-            campos={[
-              { nombre: 'nombre', etiqueta: 'Concepto', tipo: 'texto', requerido: true, placeholder: 'Ej: Prima, freelance' },
-              { nombre: 'monto', etiqueta: 'Monto', tipo: 'numero', requerido: true },
-              { nombre: 'fecha', etiqueta: 'Fecha', tipo: 'fecha', requerido: true },
-            ]}
-            onGuardar={(i) => {
-              acciones.guardarIngreso(i)
-              setIngreso(null)
-            }}
-            onEliminar={
-              ingreso.id &&
-              (() => {
-                acciones.eliminarIngreso(ingreso.id)
-                setIngreso(null)
-              })
-            }
-          />
-        </Hoja>
+      {lista.length === 0 ? (
+        <Vacio Icono={LuRepeat} titulo="Sin gastos fijos" texto="Arriendo, servicios, internet, celular, suscripciones… agrégalos una vez y se repiten cada mes.">
+          <button className="btn btn-primario" onClick={() => abrir('fijo')}><LuPlus aria-hidden="true" /> Agregar gasto fijo</button>
+        </Vacio>
+      ) : (
+        <ul className="lista tarjeta-lista">
+          {lista.map((f) => {
+            const pagado = r.pagados.includes(f.id)
+            return (
+              <li key={f.id} className={pagado ? 'pagado' : ''}>
+                <button className={`check ${pagado ? 'marcado' : ''}`} aria-label={`${f.nombre}: ${pagado ? 'pagado, marcar pendiente' : 'marcar como pagado'}`} onClick={() => acciones.togglePagoFijo(mes, f.id)}>
+                  <LuCheck />
+                </button>
+                <IconoCategoria categoria={f.categoria} tamano={36} />
+                <div className="lista-texto" onClick={() => abrir('fijo', { fijo: f })}>
+                  <strong>{f.nombre}</strong>
+                  <small>Día {f.dia} · {f.categoria}</small>
+                </div>
+                <span className="monto" onClick={() => abrir('fijo', { fijo: f })}>{fmt.dinero(f.monto)}</span>
+              </li>
+            )
+          })}
+          <li className="lista-accion"><button className="btn-texto" onClick={() => abrir('fijo')}><LuPlus aria-hidden="true" /> Agregar gasto fijo</button></li>
+        </ul>
       )}
     </>
   )
