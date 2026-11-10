@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   LuLayoutDashboard, LuReceipt, LuCreditCard, LuTarget, LuSettings, LuPlus, LuChevronLeft, LuChevronRight,
-  LuRepeat, LuWallet, LuShoppingBag, LuFileSpreadsheet, LuBanknote, LuLandmark, LuCalculator, LuBellRing, LuHandCoins, LuBriefcase, LuSprout,
+  LuRepeat, LuWallet, LuShoppingBag, LuFileSpreadsheet, LuBanknote, LuLandmark, LuCalculator, LuBellRing, LuHandCoins, LuBriefcase, LuSprout, LuPiggyBank,
 } from 'react-icons/lu'
 import { useFinanzas } from './lib/store'
 import { crearFormato, mesActual, nombreMes, sumarMeses } from './lib/format'
@@ -20,6 +20,7 @@ import {
 } from './components/Formularios'
 import { MeAlcanza, Recordatorios } from './components/Herramientas'
 import { FormReclamar, FormPosponer, FormFuente, FormIngresoUnico, AccionesRecibido } from './components/IngresosUI'
+import { FormMeta, FormAporte } from './components/AhorroUI'
 
 const PESTANAS = [
   { id: 'inicio', texto: 'Inicio', Icono: LuLayoutDashboard },
@@ -112,6 +113,7 @@ export default function App() {
               { t: 'Tarjeta o crédito', d: 'Agregar una nueva', I: LuLandmark, f: () => abrir('deuda-nueva') },
               { t: 'Ingreso', d: 'Recibido o por recibir', I: LuBanknote, f: () => abrir('ingreso') },
               { t: 'Ingreso fijo', d: 'Salario, quincena', I: LuBriefcase, f: () => abrir('fuente') },
+              { t: 'Ahorrar', d: 'Aporte a una meta', I: LuPiggyBank, f: () => { const ms = datos.metas ?? []; ms.length === 1 ? abrir('aporte', { metaId: ms[0].id }) : ms.length ? abrir('elegir-meta') : abrir('meta') } },
               { t: '¿Me alcanza?', d: 'Antes de comprar', I: LuCalculator, f: () => abrir('alcanza') },
               { t: 'Recordatorios', d: 'Pagos en tu calendario', I: LuBellRing, f: () => abrir('recordatorios') },
               { t: 'Subir Excel', d: 'Varias cosas a la vez', I: LuFileSpreadsheet, f: () => abrir('importar') },
@@ -255,6 +257,51 @@ export default function App() {
               cerrar()
               avisar(datos.config.jardin ? `¡${d.nombre} está feliz! Pago de ${fmt.dinero(m)} aplicado 💛` : `Pago de ${fmt.dinero(m)} aplicado`, { texto: 'Deshacer', onClick: () => { acciones.deshacerPago(id); avisar('Pago revertido') } })
             }} />
+          </Hoja>
+        )
+      })()}
+
+      {modal?.tipo === 'meta' && (
+        <Hoja titulo={modal.inicial?.id ? 'Editar meta' : 'Nueva meta de ahorro'} onCerrar={cerrar}>
+          <FormMeta
+            inicial={modal.inicial}
+            fmt={fmt}
+            onGuardar={(m) => { acciones.guardarMeta(m); cerrar(); avisar(modal.inicial?.id ? 'Meta actualizada' : '¡Meta creada! A ahorrar') }}
+            onEliminar={modal.inicial?.id && (() => { acciones.eliminarMeta(modal.inicial.id); cerrar() })}
+          />
+        </Hoja>
+      )}
+
+      {modal?.tipo === 'elegir-meta' && (
+        <Hoja titulo="¿A qué meta?" onCerrar={cerrar}>
+          <ul className="lista">
+            {(datos.metas ?? []).map((m) => (
+              <li key={m.id} onClick={() => abrir('aporte', { metaId: m.id })}>
+                <span className="icono-cat" style={{ '--c': '#10B981' }}><LuPiggyBank /></span>
+                <div className="lista-texto"><strong>{m.nombre}</strong><small>Meta {fmt.dinero(m.objetivo)}</small></div>
+              </li>
+            ))}
+          </ul>
+        </Hoja>
+      )}
+
+      {modal?.tipo === 'aporte' && (() => {
+        const m = (datos.metas ?? []).find((x) => x.id === modal.metaId)
+        return m && (
+          <Hoja titulo={m.nombre} subtitulo={modal.aporte ? 'Editar movimiento' : modal.retiro ? 'Retirar dinero' : 'Agregar ahorro'} onCerrar={cerrar}>
+            <FormAporte
+              meta={m}
+              retiro={modal.retiro}
+              inicial={modal.aporte}
+              fmt={fmt}
+              onGuardar={(a) => {
+                acciones.guardarAporte(m.id, a)
+                cerrar()
+                const total = (m.aportes ?? []).filter((x) => x.id !== a.id).reduce((t, x) => t + x.monto, 0) + a.monto
+                avisar(total >= m.objetivo ? `🎉 ¡Cumpliste tu meta ${m.nombre}!` : a.monto < 0 ? 'Retiro registrado' : `${fmt.dinero(a.monto)} ahorrados`)
+              }}
+              onEliminar={modal.aporte && (() => { acciones.eliminarAporte(m.id, modal.aporte.id); cerrar() })}
+            />
           </Hoja>
         )
       })()}

@@ -24,6 +24,7 @@ export const estadoInicial = {
   pagosFijos: {}, // { 'YYYY-MM': [fijoId] }
   deudas: [], // {id, nombre, tipo:'tarjeta'|'credito', color, ultimos4, cupo, tasa, tipoTasa, diaPago, compras:[]}
   pagos: [], // {id, deudaId, monto, fecha, mes, reparto, abonos, antes}
+  metas: [], // metas de ahorro: {id, nombre, objetivo, fechaMeta, icono, color, creado, aportes:[{id, monto, fecha}]}
 }
 
 const completar = (d) => {
@@ -333,6 +334,14 @@ export function useFinanzas() {
           fijos: [...s.fijos, ...fijos.map((f) => ({ ...f, id: generarId() }))],
         }
       }),
+
+    // ----- Metas de ahorro -----
+    guardarMeta: (m) => setDatos((s) => ({ ...s, metas: upsert(s.metas ?? [], { creado: Date.now(), aportes: [], ...m }) })),
+    eliminarMeta: (id) => setDatos((s) => ({ ...s, metas: (s.metas ?? []).filter((m) => m.id !== id) })),
+    guardarAporte: (metaId, a) =>
+      setDatos((s) => ({ ...s, metas: (s.metas ?? []).map((m) => (m.id === metaId ? { ...m, aportes: upsert(m.aportes ?? [], { creado: Date.now(), ...a }) } : m)) })),
+    eliminarAporte: (metaId, id) =>
+      setDatos((s) => ({ ...s, metas: (s.metas ?? []).map((m) => (m.id === metaId ? { ...m, aportes: m.aportes.filter((a) => a.id !== id) } : m)) })),
 
     importar: (nuevo) => setDatos(nuevo.version === 2 ? completar(nuevo) : desdeV1(nuevo)),
     resetear: () => setDatos(estadoInicial),

@@ -31,6 +31,7 @@ export default function Inicio({ datos, acciones, mes, fmt, ir, abrir }) {
     { nombre: 'Gastos fijos', valor: r.fijosTotal, color: '#8B5CF6' },
     { nombre: 'Tarjetas y créditos', valor: r.pagoDeudas, color: '#EF4444' },
     { nombre: 'Gastos del mes', valor: r.gastadoEfectivo, color: '#F97316' },
+    { nombre: 'Ahorro', valor: Math.max(r.ahorroMes, 0), color: '#10B981' },
     { nombre: 'Libre', valor: Math.max(r.libre, 0), color: '#FACC15' },
   ].filter((d) => d.valor > 0)
 
