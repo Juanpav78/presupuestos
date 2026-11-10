@@ -1,52 +1,94 @@
 import { useEffect, useState } from 'react'
-import { generarId, hoyISO } from './format'
+import { generarId, hoyISO, mesDe } from './format'
+import { aplicarPago, cuotaFrancesa, tasaMensual } from './deudas'
+import { normalizarCategoria } from './categorias'
 
-const CLAVE = 'finanzas-v1'
+const CLAVE = 'finanzas-v2'
 
 export const estadoInicial = {
-  version: 1,
+  version: 2,
   config: {
     moneda: 'COP',
     ingresoMensual: 0,
-    presupuestoVariable: 0, // límite de gastos del día a día
-    pagoDeudasMensual: 0, // total que quieres destinar a deudas (mínimos + extra)
+    presupuestoVariable: 0,
+    pagoDeudasMensual: 0,
     estrategia: 'avalancha',
   },
   ingresosExtra: [], // {id, nombre, monto, fecha}
-  gastos: [], // {id, nombre, monto, categoria, fecha, deudaId?}
+  gastos: [], // {id, nombre, monto, categoria, fecha, deudaId?, compraId?}
   fijos: [], // {id, nombre, monto, categoria, dia}
   pagosFijos: {}, // { 'YYYY-MM': [fijoId] }
-  deudas: [], // {id, nombre, tipo, saldo, cupo, tasa, tipoTasa, pagoMinimo, diaPago}
-  abonos: [], // {id, deudaId, monto, fecha}
+  deudas: [], // {id, nombre, tipo:'tarjeta'|'credito', color, ultimos4, cupo, tasa, tipoTasa, diaPago, compras:[]}
+  pagos: [], // {id, deudaId, monto, fecha, mes, reparto, abonos, antes}
+}
+
+const completar = (d) => ({ ...estadoInicial, ...d, config: { ...estadoInicial.config, ...d.config } })
+
+// ---------- Migraciones ----------
+const desdeV1 = (v1) => {
+  const tiposCredito = ['prestamo', 'vehiculo', 'otro']
+  const colores = ['oro', 'azul', 'morado', 'verde', 'rojo', 'negro']
+  return completar({
+    ...v1,
+    version: 2,
+    pagos: (v1.abonos ?? []).map((a) => ({ ...a, mes: mesDe(a.fecha), reparto: { intereses: 0, cuotas: 0, abono: a.monto }, abonos: [] })),
+    deudas: (v1.deudas ?? []).map((d, i) => {
+      const esCredito = tiposCredito.includes(d.tipo)
+      const saldo = Number(d.saldo) || 0
+      const pago = Number(d.pagoMinimo) || 0
+      return {
+        id: d.id,
+        nombre: d.nombre,
+        tipo: esCredito ? 'credito' : 'tarjeta',
+        color: colores[i % colores.length],
+        cupo: Number(d.cupo) || 0,
+        tasa: Number(d.tasa) || 0,
+        tipoTasa: d.tipoTasa || 'EA',
+        diaPago: Number(d.diaPago) || 1,
+        compras: saldo > 0 ? [{
+          id: generarId(),
+          nombre: esCredito ? 'Saldo del crédito' : 'Saldo anterior',
+          fecha: hoyISO(),
+          monto: saldo,
+          saldo,
+          cuotas: pago > 0 ? Math.max(Math.ceil(saldo / pago), 1) : 12,
+          cuotasPagadas: 0,
+          ...(esCredito && pago > 0 ? { cuotaFija: pago } : {}),
+        }] : [],
+      }
+    }),
+    gastos: (v1.gastos ?? []).map(({ deudaId, ...g }) => g),
+  })
+}
+
+const desdeV0 = () => {
+  const viejos = JSON.parse(localStorage.getItem('gastos') || '[]')
+  const presupuesto = Number(localStorage.getItem('presupuesto')) || 0
+  return completar({
+    config: { presupuestoVariable: presupuesto },
+    gastos: viejos.map((g) => ({
+      id: g.id || generarId(),
+      nombre: g.nombre,
+      monto: Number(g.cantidad) || 0,
+      categoria: normalizarCategoria(g.categoria),
+      fecha: g.fecha ? new Date(g.fecha).toISOString().slice(0, 10) : hoyISO(),
+    })),
+  })
 }
 
 const leer = () => {
   try {
-    const guardado = localStorage.getItem(CLAVE)
-    if (guardado) {
-      const datos = JSON.parse(guardado)
-      return { ...estadoInicial, ...datos, config: { ...estadoInicial.config, ...datos.config } }
-    }
-    // Migración desde la versión anterior de la app (claves 'gastos' y 'presupuesto')
-    const viejos = JSON.parse(localStorage.getItem('gastos') || '[]')
-    const presupuesto = Number(localStorage.getItem('presupuesto')) || 0
-    const mapaCat = { Casa: 'Vivienda', Gastos: 'Otros' }
-    return {
-      ...estadoInicial,
-      config: { ...estadoInicial.config, presupuestoVariable: presupuesto },
-      gastos: viejos.map((g) => ({
-        id: g.id || generarId(),
-        nombre: g.nombre,
-        monto: Number(g.cantidad) || 0,
-        categoria: mapaCat[g.categoria] || g.categoria || 'Otros',
-        fecha: g.fecha ? new Date(g.fecha).toISOString().slice(0, 10) : hoyISO(),
-      })),
-    }
+    const v2 = localStorage.getItem(CLAVE)
+    if (v2) return completar(JSON.parse(v2))
+    const v1 = localStorage.getItem('finanzas-v1')
+    if (v1) return desdeV1(JSON.parse(v1))
+    return desdeV0()
   } catch {
     return estadoInicial
   }
 }
 
+// ---------- Hook principal ----------
 export function useFinanzas() {
   const [datos, setDatos] = useState(leer)
 
@@ -58,47 +100,69 @@ export function useFinanzas() {
     }
   }, [datos])
 
-  const ajustarSaldo = (deudas, deudaId, delta) =>
-    deudas.map((d) => (d.id === deudaId ? { ...d, saldo: Math.max(0, Number(d.saldo) + delta) } : d))
+  const upsert = (lista, item) =>
+    item.id && lista.some((x) => x.id === item.id) ? lista.map((x) => (x.id === item.id ? { ...x, ...item } : x)) : [...lista, { ...item, id: item.id || generarId() }]
+
+  const editarDeuda = (deudas, id, fn) => deudas.map((d) => (d.id === id ? fn(d) : d))
+
+  const nuevaCompra = (c) => ({
+    id: generarId(),
+    creado: Date.now(),
+    cuotasPagadas: 0,
+    ...c,
+    monto: Number(c.monto) || 0,
+    cuotas: Math.max(Number(c.cuotas) || 1, 1),
+    saldo: c.saldo !== undefined && c.saldo !== '' ? Number(c.saldo) : Number(c.monto) || 0,
+  })
 
   const acciones = {
     setConfig: (cambios) => setDatos((s) => ({ ...s, config: { ...s.config, ...cambios } })),
 
-    // Gastos variables. Si se pagan con tarjeta (deudaId) suben el saldo de esa tarjeta.
+    // ----- Gastos del día a día. Si se pagan con tarjeta se crea una compra en ella -----
     guardarGasto: (g) =>
       setDatos((s) => {
         let deudas = s.deudas
         const anterior = s.gastos.find((x) => x.id === g.id)
-        if (anterior?.deudaId) deudas = ajustarSaldo(deudas, anterior.deudaId, -anterior.monto)
-        if (g.deudaId) deudas = ajustarSaldo(deudas, g.deudaId, g.monto)
-        const gastos = anterior
-          ? s.gastos.map((x) => (x.id === g.id ? g : x))
-          : [...s.gastos, { ...g, id: generarId() }]
-        return { ...s, gastos, deudas }
+        let compraId = anterior?.compraId
+
+        // Si cambió de tarjeta (o dejó de ser con tarjeta), quitar la compra anterior
+        if (anterior?.compraId && anterior.deudaId !== g.deudaId) {
+          deudas = editarDeuda(deudas, anterior.deudaId, (d) => ({ ...d, compras: d.compras.filter((c) => c.id !== anterior.compraId) }))
+          compraId = undefined
+        }
+        if (g.deudaId) {
+          if (compraId) {
+            deudas = editarDeuda(deudas, g.deudaId, (d) => ({
+              ...d,
+              compras: d.compras.map((c) => {
+                if (c.id !== compraId) return c
+                const pagado = (Number(c.monto) || 0) - (Number(c.saldo) || 0)
+                return { ...c, nombre: g.nombre, fecha: g.fecha, monto: g.monto, cuotas: Number(g.cuotas) || 1, saldo: Math.max(g.monto - pagado, 0) }
+              }),
+            }))
+          } else {
+            const compra = nuevaCompra({ nombre: g.nombre, fecha: g.fecha, monto: g.monto, cuotas: g.cuotas })
+            compraId = compra.id
+            deudas = editarDeuda(deudas, g.deudaId, (d) => ({ ...d, compras: [...d.compras, compra] }))
+          }
+        }
+        const gasto = { ...g, compraId: g.deudaId ? compraId : undefined, deudaId: g.deudaId || undefined }
+        return { ...s, deudas, gastos: upsert(s.gastos, gasto) }
       }),
     eliminarGasto: (id) =>
       setDatos((s) => {
         const g = s.gastos.find((x) => x.id === id)
-        const deudas = g?.deudaId ? ajustarSaldo(s.deudas, g.deudaId, -g.monto) : s.deudas
+        const deudas = g?.compraId
+          ? editarDeuda(s.deudas, g.deudaId, (d) => ({ ...d, compras: d.compras.filter((c) => c.id !== g.compraId) }))
+          : s.deudas
         return { ...s, gastos: s.gastos.filter((x) => x.id !== id), deudas }
       }),
 
-    guardarIngreso: (i) =>
-      setDatos((s) => ({
-        ...s,
-        ingresosExtra: i.id
-          ? s.ingresosExtra.map((x) => (x.id === i.id ? i : x))
-          : [...s.ingresosExtra, { ...i, id: generarId() }],
-      })),
-    eliminarIngreso: (id) =>
-      setDatos((s) => ({ ...s, ingresosExtra: s.ingresosExtra.filter((x) => x.id !== id) })),
+    guardarIngreso: (i) => setDatos((s) => ({ ...s, ingresosExtra: upsert(s.ingresosExtra, i) })),
+    eliminarIngreso: (id) => setDatos((s) => ({ ...s, ingresosExtra: s.ingresosExtra.filter((x) => x.id !== id) })),
 
-    // Gastos fijos mensuales
-    guardarFijo: (f) =>
-      setDatos((s) => ({
-        ...s,
-        fijos: f.id ? s.fijos.map((x) => (x.id === f.id ? f : x)) : [...s.fijos, { ...f, id: generarId() }],
-      })),
+    // ----- Gastos fijos -----
+    guardarFijo: (f) => setDatos((s) => ({ ...s, fijos: upsert(s.fijos, f) })),
     eliminarFijo: (id) => setDatos((s) => ({ ...s, fijos: s.fijos.filter((x) => x.id !== id) })),
     togglePagoFijo: (mes, id) =>
       setDatos((s) => {
@@ -107,36 +171,98 @@ export function useFinanzas() {
         return { ...s, pagosFijos: { ...s.pagosFijos, [mes]: nueva } }
       }),
 
-    // Deudas y tarjetas
-    guardarDeuda: (d) =>
-      setDatos((s) => ({
-        ...s,
-        deudas: d.id ? s.deudas.map((x) => (x.id === d.id ? d : x)) : [...s.deudas, { ...d, id: generarId() }],
-      })),
+    // ----- Tarjetas y créditos -----
+    /** saldoInicial: {monto, cuotas, cuotaFija} opcional para crear la deuda con su saldo actual */
+    crearDeuda: (d, saldoInicial) =>
+      setDatos((s) => {
+        const compras = []
+        if (saldoInicial?.monto > 0) {
+          const esCredito = d.tipo === 'credito'
+          const n = Math.max(Number(saldoInicial.cuotas) || 1, 1)
+          compras.push(nuevaCompra({
+            nombre: esCredito ? 'Saldo del crédito' : 'Saldo anterior',
+            fecha: hoyISO(),
+            monto: saldoInicial.monto,
+            cuotas: n,
+            ...(esCredito ? { cuotaFija: Number(saldoInicial.cuotaFija) || Math.round(cuotaFrancesa(saldoInicial.monto, tasaMensual(d), n)) } : {}),
+          }))
+        }
+        return { ...s, deudas: [...s.deudas, { ...d, id: generarId(), compras }] }
+      }),
+    guardarDeuda: (d) => setDatos((s) => ({ ...s, deudas: s.deudas.map((x) => (x.id === d.id ? { ...x, ...d } : x)) })),
     eliminarDeuda: (id) =>
       setDatos((s) => ({
         ...s,
         deudas: s.deudas.filter((x) => x.id !== id),
-        abonos: s.abonos.filter((a) => a.deudaId !== id),
-        gastos: s.gastos.map((g) => (g.deudaId === id ? { ...g, deudaId: undefined } : g)),
+        pagos: s.pagos.filter((p) => p.deudaId !== id),
+        gastos: s.gastos.map((g) => (g.deudaId === id ? { ...g, deudaId: undefined, compraId: undefined } : g)),
       })),
-    registrarAbono: (a) =>
+
+    guardarCompra: (deudaId, c) =>
       setDatos((s) => ({
         ...s,
-        abonos: [...s.abonos, { ...a, id: generarId() }],
-        deudas: ajustarSaldo(s.deudas, a.deudaId, -a.monto),
+        deudas: editarDeuda(s.deudas, deudaId, (d) => ({
+          ...d,
+          compras: c.id
+            ? d.compras.map((x) => (x.id === c.id ? { ...x, ...c, monto: Number(c.monto), cuotas: Math.max(Number(c.cuotas) || 1, 1), saldo: Number(c.saldo) } : x))
+            : [...d.compras, nuevaCompra(c)],
+        })),
       })),
-    eliminarAbono: (id) =>
+    eliminarCompra: (deudaId, compraId) =>
+      setDatos((s) => ({
+        ...s,
+        deudas: editarDeuda(s.deudas, deudaId, (d) => ({ ...d, compras: d.compras.filter((c) => c.id !== compraId) })),
+        gastos: s.gastos.map((g) => (g.compraId === compraId ? { ...g, deudaId: undefined, compraId: undefined } : g)),
+      })),
+
+    /** Pago a una tarjeta/crédito: se reparte como lo hace el banco. */
+    pagarDeuda: (deudaId, monto, fecha) =>
       setDatos((s) => {
-        const a = s.abonos.find((x) => x.id === id)
+        const d = s.deudas.find((x) => x.id === deudaId)
+        if (!d) return s
+        const mes = mesDe(fecha)
+        const res = aplicarPago(d, monto, mes)
+        const pago = { id: generarId(), deudaId, monto: Number(monto), fecha, mes, reparto: res.reparto, abonos: res.abonos, antes: d.compras }
+        return { ...s, pagos: [...s.pagos, pago], deudas: editarDeuda(s.deudas, deudaId, (x) => ({ ...x, compras: res.compras })) }
+      }),
+    /** Deshace el último pago de una deuda (restaura las compras como estaban). */
+    deshacerPago: (pagoId) =>
+      setDatos((s) => {
+        const p = s.pagos.find((x) => x.id === pagoId)
+        if (!p) return s
         return {
           ...s,
-          abonos: s.abonos.filter((x) => x.id !== id),
-          deudas: a ? ajustarSaldo(s.deudas, a.deudaId, a.monto) : s.deudas,
+          pagos: s.pagos.filter((x) => x.id !== pagoId),
+          deudas: p.antes ? editarDeuda(s.deudas, p.deudaId, (d) => ({ ...d, compras: p.antes })) : s.deudas,
         }
       }),
 
-    importar: (nuevo) => setDatos({ ...estadoInicial, ...nuevo, config: { ...estadoInicial.config, ...nuevo.config } }),
+    /** Importa datos leídos de Excel (se agregan a lo que ya existe). */
+    importarLote: ({ deudas = [], gastos = [], fijos = [] }) =>
+      setDatos((s) => {
+        let lista = [...s.deudas]
+        for (const nd of deudas) {
+          const existente = lista.find((x) => x.nombre.trim().toLowerCase() === nd.nombre.trim().toLowerCase())
+          const compras = nd.compras.map(nuevaCompra)
+          if (existente) {
+            lista = lista.map((x) =>
+              x.id === existente.id
+                ? { ...x, ...Object.fromEntries(Object.entries(nd.datos).filter(([, v]) => v !== undefined && v !== '')), compras: [...x.compras, ...compras] }
+                : x
+            )
+          } else {
+            lista.push({ id: generarId(), ...nd.datos, compras })
+          }
+        }
+        return {
+          ...s,
+          deudas: lista,
+          gastos: [...s.gastos, ...gastos.map((g) => ({ ...g, id: generarId() }))],
+          fijos: [...s.fijos, ...fijos.map((f) => ({ ...f, id: generarId() }))],
+        }
+      }),
+
+    importar: (nuevo) => setDatos(nuevo.version === 2 ? completar(nuevo) : desdeV1(nuevo)),
     resetear: () => setDatos(estadoInicial),
   }
 
