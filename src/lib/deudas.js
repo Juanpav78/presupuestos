@@ -209,3 +209,77 @@ export const simularPlan = (deudas, presupuestoMensual, estrategia = 'avalancha'
 
   return { meses: mes, totalIntereses, totalPagado, serie, ordenPago, atascada: total() > 0.5, primerMes }
 }
+
+// ---------- Proyección: supone que cada mes pagas lo que corresponde ----------
+const sumarMes = (mes, n) => {
+  const [y, m] = mes.split('-').map(Number)
+  const d = new Date(y, m - 1 + n, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+const difMeses = (a, b) => {
+  const [y1, m1] = a.split('-').map(Number)
+  const [y2, m2] = b.split('-').map(Number)
+  return (y2 - y1) * 12 + (m2 - m1)
+}
+
+/**
+ * Proyecta los próximos n meses de una deuda desde `desde` (mes actual),
+ * asumiendo que cada mes se paga exactamente lo que cobra el banco.
+ * Devuelve [{ mes, interes, capital, total, saldo (al final del mes), terminan: [nombres] }]
+ */
+export const proyectar = (d, desde, n = 12) => {
+  const r = tasaMensual(d)
+  const compras = ordenarCompras(d.compras ?? []).filter((c) => c.saldo > 0.5).map((c) => ({ ...c }))
+  const meses = []
+  for (let i = 0; i < n; i++) {
+    const mes = sumarMes(desde, i)
+    let interes = 0
+    let capital = 0
+    const terminan = []
+    for (const c of compras) {
+      if (c.saldo <= 0.5) continue
+      const cc = cobroCompra(c, r, mes)
+      interes += cc.interes
+      capital += cc.capital
+      if (cc.total > 0) {
+        c.saldo = r2(c.saldo - cc.capital)
+        c.cuotasPagadas = (Number(c.cuotasPagadas) || 0) + 1
+        if (c.saldo <= 0.5) { c.saldo = 0; terminan.push(c.nombre) }
+      }
+    }
+    meses.push({ mes, interes: r2(interes), capital: r2(capital), total: r2(interes + capital), saldo: r2(compras.reduce((t, c) => t + c.saldo, 0)), terminan })
+  }
+  return meses
+}
+
+/** Mes en que termina de pagarse cada compra (pagando lo del mes). { compraId: 'YYYY-MM' | null } */
+export const finCompras = (d, desde) => {
+  const r = tasaMensual(d)
+  const fin = {}
+  for (const c of d.compras ?? []) {
+    if (c.saldo <= 0.5) continue
+    const x = { ...c }
+    fin[c.id] = null
+    for (let i = 0; i < 600; i++) {
+      const mes = sumarMes(desde, i)
+      const cc = cobroCompra(x, r, mes)
+      if (cc.total <= 0) continue // ya pagada este mes
+      if (cc.capital <= 0) break // la cuota no cubre intereses: nunca termina
+      x.saldo -= cc.capital
+      x.cuotasPagadas = (Number(x.cuotasPagadas) || 0) + 1
+      if (x.saldo <= 0.5) { fin[c.id] = mes; break }
+    }
+  }
+  return fin
+}
+
+/**
+ * Lo que se cobra en un mes. Para meses futuros se proyecta suponiendo
+ * que los meses anteriores se pagaron.
+ */
+export const cobroProyectado = (d, mes, actual) => {
+  const k = difMeses(actual, mes)
+  if (k <= 0) return cobroDelMes(d, mes)
+  const p = proyectar(d, actual, k + 1).at(-1)
+  return { interes: p.interes, capital: p.capital, total: p.total, proyectado: true }
+}

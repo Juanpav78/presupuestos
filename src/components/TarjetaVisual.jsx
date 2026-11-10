@@ -1,11 +1,11 @@
 import { LuLandmark, LuNfc } from 'react-icons/lu'
 import { color, degradado, mesActual } from '../lib/format'
-import { cobroDelMes, saldoDeuda, tasaEA } from '../lib/deudas'
+import { cobroProyectado, saldoDeuda, tasaEA } from '../lib/deudas'
 
 export default function TarjetaVisual({ deuda, fmt, onClick, mes = mesActual(), estilo }) {
   const c = color(deuda.color)
   const saldo = saldoDeuda(deuda)
-  const cobro = cobroDelMes(deuda, mes)
+  const cobro = cobroProyectado(deuda, mes, mesActual())
   const esTarjeta = deuda.tipo !== 'credito'
   const uso = esTarjeta && deuda.cupo > 0 ? Math.min(saldo / deuda.cupo, 1) : null
   const Etiqueta = onClick ? 'button' : 'div'

@@ -216,24 +216,58 @@ export function useFinanzas() {
       })),
 
     /** Pago a una tarjeta/crédito: se reparte como lo hace el banco. */
-    pagarDeuda: (deudaId, monto, fecha) =>
+    /** Devuelve el id del pago para poder deshacerlo. */
+    pagarDeuda: (deudaId, monto, fecha) => {
+      const id = generarId()
       setDatos((s) => {
         const d = s.deudas.find((x) => x.id === deudaId)
         if (!d) return s
         const mes = mesDe(fecha)
         const res = aplicarPago(d, monto, mes)
-        const pago = { id: generarId(), deudaId, monto: Number(monto), fecha, mes, reparto: res.reparto, abonos: res.abonos, antes: d.compras }
+        const pago = { id, deudaId, monto: Number(monto), fecha, mes, reparto: res.reparto, abonos: res.abonos, antes: d.compras }
         return { ...s, pagos: [...s.pagos, pago], deudas: editarDeuda(s.deudas, deudaId, (x) => ({ ...x, compras: res.compras })) }
-      }),
-    /** Deshace el último pago de una deuda (restaura las compras como estaban). */
+      })
+      return id
+    },
+    /**
+     * Deshace cualquier pago: vuelve las compras a como estaban antes de ese pago
+     * y vuelve a aplicar, en orden, los pagos que se hicieron después.
+     */
     deshacerPago: (pagoId) =>
       setDatos((s) => {
-        const p = s.pagos.find((x) => x.id === pagoId)
-        if (!p) return s
+        const idx = s.pagos.findIndex((x) => x.id === pagoId)
+        if (idx < 0) return s
+        const p = s.pagos[idx]
+        const d = s.deudas.find((x) => x.id === p.deudaId)
+        const pagos = s.pagos.filter((x) => x.id !== pagoId)
+        if (!d) return { ...s, pagos }
+
+        const posteriores = s.pagos.slice(idx + 1).filter((x) => x.deudaId === p.deudaId)
+        let compras
+        if (p.antes) {
+          const actuales = new Set(d.compras.map((c) => c.id))
+          const enBase = new Set(p.antes.map((c) => c.id))
+          // Compras de antes del pago que todavía existen + compras agregadas después
+          const agregadas = d.compras
+            .filter((c) => !enBase.has(c.id))
+            .map((c) => posteriores.map((q) => q.antes?.find((x) => x.id === c.id)).find(Boolean) ?? c)
+          compras = [...p.antes.filter((c) => actuales.has(c.id)), ...agregadas]
+        } else {
+          // Pagos viejos sin detalle: se devuelve el monto a la compra más antigua
+          compras = d.compras.map((c, i) => (i === 0 ? { ...c, saldo: c.saldo + p.monto } : c))
+        }
+
+        // Volver a aplicar los pagos posteriores sobre el nuevo estado
+        const rehechos = {}
+        for (const q of posteriores) {
+          const res = aplicarPago({ ...d, compras }, q.monto, q.mes)
+          rehechos[q.id] = { ...q, antes: compras, reparto: res.reparto, abonos: res.abonos }
+          compras = res.compras
+        }
         return {
           ...s,
-          pagos: s.pagos.filter((x) => x.id !== pagoId),
-          deudas: p.antes ? editarDeuda(s.deudas, p.deudaId, (d) => ({ ...d, compras: p.antes })) : s.deudas,
+          pagos: pagos.map((x) => rehechos[x.id] ?? x),
+          deudas: editarDeuda(s.deudas, d.id, (x) => ({ ...x, compras })),
         }
       }),
 

@@ -199,7 +199,11 @@ export default function App() {
         const d = datos.deudas.find((x) => x.id === modal.deudaId)
         return d && (
           <Hoja titulo={`Pagar ${d.nombre}`} subtitulo="Primero intereses y cuotas del mes; el excedente abona a la compra más antigua" onCerrar={cerrar}>
-            <FormPago deuda={d} fmt={fmt} onPagar={(m, f) => { acciones.pagarDeuda(d.id, m, f); cerrar(); avisar(`Pago de ${fmt.dinero(m)} aplicado`) }} />
+            <FormPago deuda={d} fmt={fmt} onPagar={(m, f) => {
+              const id = acciones.pagarDeuda(d.id, m, f)
+              cerrar()
+              avisar(`Pago de ${fmt.dinero(m)} aplicado`, { texto: 'Deshacer', onClick: () => { acciones.deshacerPago(id); avisar('Pago revertido') } })
+            }} />
           </Hoja>
         )
       })()}

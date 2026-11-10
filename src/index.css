@@ -602,6 +602,7 @@ input[type='range']::-moz-range-thumb { width: 22px; height: 22px; border-radius
   animation: aviso 2.6s var(--suave) both;
 }
 .aviso svg { color: var(--acento); font-size: 18px; }
+.aviso-accion { pointer-events: auto; margin-left: 6px; padding: 6px 12px; min-height: 34px; border-radius: 10px; background: var(--acento); color: var(--acento-tinta); font-weight: 800; font-size: 13px; }
 
 /* ---------- Animaciones ---------- */
 @keyframes entrar { from { opacity: 0; transform: translateY(14px); } }
@@ -624,3 +625,34 @@ input[type='range']::-moz-range-thumb { width: 22px; height: 22px; border-radius
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0ms !important; transition-duration: 0.01ms !important; }
   .tv-brillo { display: none; }
 }
+
+/* ---------- Compras con distintivos ---------- */
+.grupo-compras { display: flex; flex-direction: column; }
+.grupo-titulo { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 10px 0 2px; font-size: 13px; border-bottom: 1px solid var(--linea); }
+.grupo-titulo span { font-weight: 800; color: var(--texto); }
+.grupo-titulo small { color: var(--texto-2); font-weight: 600; }
+.lista li.compra { align-items: flex-start; position: relative; }
+.lista li.compra::before { content: ''; position: absolute; left: -18px; top: 14px; bottom: 14px; width: 3px; border-radius: 0 3px 3px 0; background: var(--c); }
+.compra-avatar {
+  width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex-shrink: 0; margin-top: 2px;
+  font-weight: 850; font-size: 16px; color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent);
+}
+.compra-fila.sub b { color: var(--texto); }
+.cuotas-barra { display: flex; gap: 3px; }
+.cuotas-barra i { flex: 1; height: 7px; border-radius: 3px; background: var(--superficie-2); transition: background 0.3s; }
+.cuotas-barra i.hecha { background: var(--c); }
+.cuotas-barra i.actual { background: color-mix(in srgb, var(--c) 40%, transparent); animation: latir 1.6s ease-in-out infinite; }
+.insignias { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.insignias em {
+  font-style: normal; font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 6px;
+  background: var(--superficie-2); color: var(--texto-2); white-space: nowrap;
+}
+.insignias em.nueva { background: #dbeafe; color: #1e40af; }
+.insignias em.verde { background: color-mix(in srgb, var(--verde) 15%, transparent); color: var(--verde); }
+.insignias em.acento { background: var(--acento); color: var(--acento-tinta); }
+.insignias em.rojo { background: color-mix(in srgb, var(--rojo) 15%, transparent); color: var(--rojo); }
+@media (prefers-color-scheme: dark) { .insignias em.nueva { background: #1e3a8a; color: #bfdbfe; } }
+.ver-terminadas { align-self: flex-start; color: var(--texto-2); }
+.terminadas li { opacity: 0.65; }
+.proximos li { animation: entrar 0.4s var(--suave) both; }
+@keyframes latir { 50% { opacity: 0.45; } }

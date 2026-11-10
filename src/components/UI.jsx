@@ -270,15 +270,17 @@ export function NumeroAnimado({ valor, formato, duracion = 700 }) {
 }
 
 // ---------- Avisos (toast) ----------
-export const avisar = (texto) => window.dispatchEvent(new CustomEvent('aviso', { detail: texto }))
+/** avisar('texto') o avisar('texto', { texto: 'Deshacer', onClick }) para mostrar un botón de acción. */
+export const avisar = (texto, accion) => window.dispatchEvent(new CustomEvent('aviso', { detail: { texto, accion } }))
 
 export function Avisos() {
   const [lista, setLista] = useState([])
   useEffect(() => {
     const f = (e) => {
       const id = Math.random()
-      setLista((l) => [...l, { id, texto: e.detail }])
-      setTimeout(() => setLista((l) => l.filter((x) => x.id !== id)), 2600)
+      const duracion = e.detail.accion ? 6000 : 2600
+      setLista((l) => [...l, { id, ...e.detail, duracion }])
+      setTimeout(() => setLista((l) => l.filter((x) => x.id !== id)), duracion)
     }
     window.addEventListener('aviso', f)
     return () => window.removeEventListener('aviso', f)
@@ -286,8 +288,19 @@ export function Avisos() {
   return (
     <div className="avisos" role="status" aria-live="polite">
       {lista.map((a) => (
-        <div key={a.id} className="aviso">
-          <LuCheck aria-hidden="true" /> {a.texto}
+        <div key={a.id} className="aviso" style={{ animationDuration: `${a.duracion}ms` }}>
+          <LuCheck aria-hidden="true" /> <span>{a.texto}</span>
+          {a.accion && (
+            <button
+              className="aviso-accion"
+              onClick={() => {
+                a.accion.onClick()
+                setLista((l) => l.filter((x) => x.id !== a.id))
+              }}
+            >
+              {a.accion.texto}
+            </button>
+          )}
         </div>
       ))}
     </div>
