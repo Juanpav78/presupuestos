@@ -1,4 +1,14 @@
-# Mis Finanzas 💛
+# 💛 Mis Finanzas
+
+> App de finanzas personales pensada para el celular: controla gastos y tarjetas de crédito, arma un plan para salir de deudas y ahorra para tus metas.
+
+![React](https://img.shields.io/badge/React_18-20232A?style=flat&logo=react&logoColor=61DAFB)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat&logo=vite&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black)
+![Excel](https://img.shields.io/badge/Excel_import%2Fexport-217346?style=flat&logo=microsoftexcel&logoColor=white)
+![Netlify](https://img.shields.io/badge/Netlify-00C7B7?style=flat&logo=netlify&logoColor=white)
+
+**Lo que demuestra este proyecto:** lógica financiera real (intereses E.A. y M.V., compras a cuotas, día de corte y de pago, estrategias avalancha y bola de nieve), importación y exportación de Excel con JSZip, estado persistente en `localStorage` y una interfaz mobile-first sin backend.
 
 App web pensada para el celular para controlar tus gastos y tus tarjetas de crédito, y para armar un plan para salir de deudas. Todo se guarda en tu dispositivo (localStorage); no hay servidor ni cuentas.
 
@@ -30,3 +40,7 @@ Botón **＋ → Subir Excel** (o en Tarjetas / Ajustes). Descarga la plantilla:
 npm install
 npm run dev
 ```
+
+---
+
+Hecho por **Juan Pablo Alvarado** · [Portafolio](https://juanpalvaradov.com) · [LinkedIn](https://www.linkedin.com/in/juanpavpandax/) · [GitHub](https://github.com/Juanpav78)
